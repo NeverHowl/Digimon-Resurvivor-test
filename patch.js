@@ -1,6 +1,7 @@
 (()=>{
 'use strict';
-const DR_VERSION='0.18.3a',DR_BUILD_LABEL='복구 장치',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
+const DR_VERSION='0.18.7',DR_BUILD_LABEL='6단계 보상 화면·기적 정리',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
+let evoQuiet=0; // >0 while a practice trial is being assembled: its setup evolutions are silent
 if(!window.DR_SPRITE_DATA){const n=document.getElementById('gameErrorNotice');if(n){n.hidden=false;n.textContent='sprite_data.js 파일을 불러오지 못했습니다. patch.js와 같은 폴더에 함께 올렸는지 확인한 뒤 새로고침해 주세요.'}throw new Error('sprite_data.js missing')}
 const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rnd=(a,b)=>a+Math.random()*(b-a), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const menu=$('#menu'),sel=$('#select'),game=$('#game'),canvas=$('#c'),ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
@@ -135,7 +136,7 @@ function hitEnemy(e,amount,source,element,burn=0,chill=0,spore=0,instantFreeze=f
  if(e.hp<=0)killEnemy(e,source)}
 function freezeEnemy(e,ult=false){const t=(e.kind==='boss'||e.kind==='elite')?2.0:4.2;e.freezeT=Math.max(e.freezeT||0,t);e.stun=Math.max(e.stun,t);e.chill=0;effects.push({type:'ring',x:e.x,y:e.y,r:e.r+14,t:.25,color:'#7bdcff'})}
 function combust(e,source){if(e.spore<=0||e.burn<=0)return;e.spore--;e.burnT+=3;e.burnMult=1.5*(source?.burnBonus||1);let spread=enemies.filter(x=>!x.dead&&x!==e&&dist(x,e)<120).slice(0,2);for(const x of spread){x.burn=clamp((x.burn||0)+1,0,5);x.burnT=4}effects.push({type:'burst',x:e.x,y:e.y,r:90,t:.35,color:'#ffa942'})}
-function killEnemy(e,source){if(e.dead)return;e.dead=true;if(zoneActive&&e.kind!=='boss')zoneKillCount++;if(source)source.ult=clamp(source.ult+(e.kind==='elite'?12:e.kind==='boss'?22:2.5),0,100);gainExp(e.xp);if(e.kind==='elite'){spawnEgg(e.x,e.y);for(const c of party)c.ep=clamp(c.ep+35,0,999);showMsg('진화 오브 +35',900)}if(e.kind==='boss'){for(const c of party)c.ep=clamp(c.ep+50,0,999);showMsg(`STAGE ${stage} BOSS DOWN · 진화 오브 +50`,1400);startFieldBGM()}}
+function killEnemy(e,source){if(e.dead)return;e.dead=true;if(zoneActive&&e.kind!=='boss')zoneKillCount++;if(source)source.ult=clamp(source.ult+(e.kind==='elite'?12:e.kind==='boss'?22:2.5),0,100);gainExp(e.xp);if(e.kind==='elite'){spawnEgg(e.x,e.y)}if(e.kind==='boss'){showMsg(`STAGE ${stage} BOSS DOWN`,1400);startFieldBGM()}}
 function gainExp(v){exp+=v;let ups=0;while(exp>=expNeed){exp-=expNeed;level++;ups++;expNeed=nextExpNeed(level);modalQueue.push({type:'buff'})}if(ups>1)showMsg(`LEVEL UP ×${ups}`,1000);if(ups&&!paused)openNextModal()}
 const rarityDefs={common:{n:'일반',m:1,w:62,cls:'common'},rare:{n:'희귀',m:1.5,w:25,cls:'rare'},epic:{n:'영웅',m:2.1,w:10,cls:'epic'},legendary:{n:'전설',m:3,w:3,cls:'legendary'}};
 function rollRarity(min='common'){const order=['common','rare','epic','legendary'],mi=order.indexOf(min),pool=order.slice(mi),sum=pool.reduce((s,k)=>s+rarityDefs[k].w,0);let r=Math.random()*sum;for(const k of pool){r-=rarityDefs[k].w;if(r<=0)return k}return pool[pool.length-1]}
@@ -153,10 +154,10 @@ const cards=[
  {id:'range',cat:'general',name:'공격 범위 확장',desc:'기본공격 범위 증가',tags:['basic'],apply:(c,m)=>c.attackRangeBonus+=.12*m},
  {id:'skillRange',cat:'general',name:'스킬 범위 확장',desc:'E/Q/서브웨폰 범위 증가',tags:['skill'],apply:(c,m)=>c.skillRangeBonus+=.15*m},
  {id:'cdr',cat:'general',name:'스킬 가속',desc:'스킬 쿨다운 감소',tags:['skill','agility'],apply:(c,m,r)=>{const vals={common:.06,rare:.09,epic:.12,legendary:.16};c.cdr=clamp(c.cdr+vals[r],0,.5)}},
- {id:'virus',cat:'general',name:'바이러스 조각',desc:'공격력↑ · 진화포인트 대량 · Virus +1',tags:['virus','attack'],apply:(c,m)=>{c.atk+=18+(c.base.digital==='virus'?8:0);c.virus++;c.ep=clamp(c.ep+20,0,999);if(c.virus%3===0)c.def-=2}},
- {id:'vaccine',cat:'general',name:'백신 조각',desc:'공격력/체력↑ · 진화포인트 대량 · Vaccine +1',tags:['vaccine','defense'],apply:(c,m)=>{c.atk+=10+(c.base.digital==='vaccine'?8:0);c.maxHp+=100;c.hp+=100;c.vaccine++;c.ep=clamp(c.ep+20,0,999)}},
- {id:'data',cat:'general',name:'데이터 조각',desc:'공격력/민첩↑ · 진화포인트 대량 · Data +1',tags:['data','agility'],apply:(c,m)=>{c.atk+=6+(c.base.digital==='data'?8:0);c.agi+=12;c.data++;c.ep=clamp(c.ep+20,0,999)}},
- {id:'evo',cat:'general',name:'진화 에너지',desc:'진화 포인트 대량 획득',tags:[],apply:(c,m)=>c.ep=clamp(c.ep+45*m,0,999)},
+ {id:'virus',cat:'general',name:'바이러스 조각',desc:'공격력↑ · 진화포인트 대량 · Virus +1',tags:['virus','attack'],apply:(c,m)=>{c.atk+=18+(c.base.digital==='virus'?8:0);c.virus++;grantEvo(c,20,'card');if(c.virus%3===0)c.def-=2}},
+ {id:'vaccine',cat:'general',name:'백신 조각',desc:'공격력/체력↑ · 진화포인트 대량 · Vaccine +1',tags:['vaccine','defense'],apply:(c,m)=>{c.atk+=10+(c.base.digital==='vaccine'?8:0);c.maxHp+=100;c.hp+=100;c.vaccine++;grantEvo(c,20,'card')}},
+ {id:'data',cat:'general',name:'데이터 조각',desc:'공격력/민첩↑ · 진화포인트 대량 · Data +1',tags:['data','agility'],apply:(c,m)=>{c.atk+=6+(c.base.digital==='data'?8:0);c.agi+=12;c.data++;grantEvo(c,20,'card')}},
+ {id:'evo',cat:'general',name:'진화 에너지',desc:'진화 포인트 대량 획득',tags:[],apply:(c,m)=>grantEvo(c,45*m,'card')},
  {id:'atkspd',cat:'combat',name:'연타 본능',desc:'기본공격 속도 증가',tags:['basic','agility'],apply:(c,m)=>c.attackSpeedBonus+=.20*m},
  {id:'dashcrit',cat:'combat',name:'대쉬 브레이커',desc:'대쉬 후 다음 평타 피해 2배',tags:['dodge','basic'],apply:c=>c.mods.dashCrit=true},
  {id:'third',cat:'combat',name:'3연격 피니시',desc:'기본공격 3회마다 추가 범위타',tags:['basic'],min:'rare',apply:c=>c.mods.thirdHit=true},
@@ -1057,8 +1058,7 @@ const V040_oldInit=initGame;initGame=function(){
   // Seed selected starter's shared starter loadout before the stock reset, then restore after it.
   V040_oldInit();
   party=[mkChar(selectedStarter)];active=0;party[0].x=WORLD.w/2;party[0].y=WORLD.h/2;ensureStarterLoadout(selectedStarter);
-  if(selectedStarter==='plotmon'){ownedPassives.precocious=3;party[0].passive='precocious'}
-  else if(defaultPassive[selectedStarter]){ownedPassives[defaultPassive[selectedStarter]]=Math.max(1,ownedPassives[defaultPassive[selectedStarter]]||0);party[0].passive=defaultPassive[selectedStarter]}
+  if(defaultPassive[selectedStarter]){ownedPassives[defaultPassive[selectedStarter]]=Math.max(1,ownedPassives[defaultPassive[selectedStarter]]||0);party[0].passive=defaultPassive[selectedStarter]}
   if(defaultSub[selectedStarter]){ownedSubs[defaultSub[selectedStarter]]=Math.max(1,ownedSubs[defaultSub[selectedStarter]]||0);party[0].equipSub=defaultSub[selectedStarter]}
   showMsg(`v0.4 · ${charDefs[selectedStarter].name}으로 시작`,1800);
 };
@@ -1102,7 +1102,7 @@ const V040_skillInfo=skillInfo;skillInfo=function(c){let rows=V040_skillInfo(c);
 // Random recruitment from any starter not represented by base lineage in party; duplicate lock remains from v0.3.7.
 function baseStarterFor(c){let f=c.form;if(['agumon','greymon','metalgreymon','wargreymon','skullgreymon'].includes(f))return'agumon';if(GAB_LINE.has(f))return'gabumon';if(PAL_LINE.has(f))return'palmon';if(BIYO_LINE.has(f))return'biyomon';if(GOMA_LINE.has(f))return'gomamon';if(TENTO_LINE.has(f))return'tentomon';if(PATA_LINE.has(f))return'patamon';if(PLOT_LINE.has(f))return'plotmon';return f}
 spawnEgg=function(x,y){let used=new Set(party.map(baseStarterFor)),pool=STARTER_IDS.filter(id=>!used.has(id));if(!pool.length)return;let id=pool[Math.floor(Math.random()*pool.length)];eggs.push({x,y,id,resolved:false})};
-showEggModal=function(id){if(party.some(c=>baseStarterFor(c)===id)){closeModal();return}$('#modal').classList.add('show');$('#rerollBtn').style.display='none';let d=charDefs[id],m=STARTER_META[id];$('#modalTitle').textContent='디지에그가 부화했다';$('#modalSub').textContent=party.length<3?'동료로 영입하거나 넘길 수 있습니다.':'파티가 가득 찼습니다. 교체할 멤버를 선택하거나 넘길 수 있습니다.';let box=$('#choices');box.className='choices';box.innerHTML='';let recruit=()=>{ensureStarterLoadout(id);if(id==='plotmon')ownedPassives.precocious=Math.max(3,ownedPassives.precocious||0);let c=mkChar(id),a=activeChar();c.x=a.x;c.y=a.y;c.ep=Math.round((party.reduce((s,x)=>s+x.ep,0)/party.length)*.75);c.ult=30;if(party.length<3)party.push(c);return c};if(party.length<3){let a=document.createElement('button');a.className='choice rare';a.innerHTML=`<h3>${d.name} 영입</h3><p>${m.role}<br>${m.desc}</p>`;a.onclick=()=>{recruit();showMsg(d.name+' 합류!',1200);closeModal()};box.appendChild(a)}else{for(let i=0;i<party.length;i++){let old=party[i],b=document.createElement('button');b.className='choice rare';b.innerHTML=`<h3>${old.name} → ${d.name}</h3><p>${m.role}<br>현재 ${i+1}번 멤버를 교체합니다.</p>`;b.onclick=()=>{let c=recruit();party[i]=c;if(active===i){c.x=old.x;c.y=old.y}showMsg(`${old.name} ↔ ${d.name}`,1200);closeModal()};box.appendChild(b)}}let s=document.createElement('button');s.className='choice ghost';s.innerHTML='<h3>넘기기</h3><p>이번 동료를 영입하지 않습니다.</p>';s.onclick=closeModal;box.appendChild(s)};
+showEggModal=function(id){if(party.some(c=>baseStarterFor(c)===id)){closeModal();return}$('#modal').classList.add('show');$('#rerollBtn').style.display='none';let d=charDefs[id],m=STARTER_META[id];$('#modalTitle').textContent='디지에그가 부화했다';$('#modalSub').textContent=party.length<3?'동료로 영입하거나 넘길 수 있습니다.':'파티가 가득 찼습니다. 교체할 멤버를 선택하거나 넘길 수 있습니다.';let box=$('#choices');box.className='choices';box.innerHTML='';let recruit=()=>{ensureStarterLoadout(id);let c=mkChar(id),a=activeChar();c.x=a.x;c.y=a.y;c.ep=Math.round((party.reduce((s,x)=>s+x.ep,0)/party.length)*.75);c.ult=30;if(party.length<3)party.push(c);return c};if(party.length<3){let a=document.createElement('button');a.className='choice rare';a.innerHTML=`<h3>${d.name} 영입</h3><p>${m.role}<br>${m.desc}</p>`;a.onclick=()=>{recruit();showMsg(d.name+' 합류!',1200);closeModal()};box.appendChild(a)}else{for(let i=0;i<party.length;i++){let old=party[i],b=document.createElement('button');b.className='choice rare';b.innerHTML=`<h3>${old.name} → ${d.name}</h3><p>${m.role}<br>현재 ${i+1}번 멤버를 교체합니다.</p>`;b.onclick=()=>{let c=recruit();party[i]=c;if(active===i){c.x=old.x;c.y=old.y}showMsg(`${old.name} ↔ ${d.name}`,1200);closeModal()};box.appendChild(b)}}let s=document.createElement('button');s.className='choice ghost';s.innerHTML='<h3>넘기기</h3><p>이번 동료를 영입하지 않습니다.</p>';s.onclick=closeModal;box.appendChild(s)};
 
 // v0.4 visual language: identifiable subweapon silhouettes.
 function drawProjectileV4(p){
@@ -2497,7 +2497,6 @@ killEnemy=function(e,source){
   if(wasElite)e.kind='elite';
   if(!e.dead)return;
   if(controlled){
-    for(const c of party)c.ep=clamp(c.ep+12*(typeof v107Has==='function'&&v107Has(c,'impmonGun')?1.5:1),0,999);
     const guaranteed=party.length<3,drop=guaranteed||Math.random()<.18;
     // Town gimmick eggs are independent of the legacy outstanding recruit-drop limit.
     if(drop&&!eggs.some(egg=>!egg.v173TownEgg)){spawnEgg(e.x,e.y);showMsg('강화 엘리트 격파 · 디지에그 드랍!',1100)}
@@ -2832,7 +2831,7 @@ function v064Fix2ShowHealChoice(q){
   $('#modalSub').textContent=`회복할 디지몬을 선택하세요 · 최대 HP의 ${Math.round(q.heal*100)}% 회복`;
   const box=$('#choices'); box.className='choices'; box.innerHTML='';
   for(const c of party){
-    if(c.dead)continue;
+    if(c.dead&&!ldDown.has(c))continue;
     const amount=Math.max(1,Math.round(c.maxHp*q.heal));
     const before=Math.round(c.hp), after=Math.round(Math.min(c.maxHp,c.hp+amount));
     const b=document.createElement('button'); b.className='choice '+(q.boss?'legendary':'rare');
@@ -2990,7 +2989,7 @@ showEggModal=function(id){
     const a=document.createElement('button'); a.className='choice rare';
     a.innerHTML=`<h3>🥚 ${d.name} 재합류</h3><p>${m.role}<br>${m.desc}</p><small>성장기 확정 · 빈 파티 슬롯 사용</small>`;
     a.onclick=()=>{
-      ensureStarterLoadout(id); if(id==='plotmon')ownedPassives.precocious=Math.max(3,ownedPassives.precocious||0);
+      ensureStarterLoadout(id);
       const nc=mkChar(id),anchor=activeChar()||party[0];
       nc.x=anchor?anchor.x+45:WORLD.w/2; nc.y=anchor?anchor.y+35:WORLD.h/2;
       nc.ep=party.length?Math.round((party.reduce((sum,c)=>sum+c.ep,0)/party.length)*.75):0; nc.ult=30;
@@ -3593,11 +3592,9 @@ const V068_killEnemyBase=killEnemy;
 killEnemy=function(e,source){
   if(e.dead)return;
   const eliteBefore=e.kind==='elite',bossBefore=e.kind==='boss'||!!e.v06BossId;
-  const epBefore=party.map(c=>c.ep);
   V068_killEnemyBase(e,source);
   if(!e.dead||(!eliteBefore&&!bossBefore))return;
-  // Strip every legacy/direct EP grant from the kill itself. EP comes only from the reward choice.
-  party.forEach((c,i)=>{if(epBefore[i]!=null)c.ep=epBefore[i]});
+  // v0.18.5: kills no longer grant EVO at all; it comes only from the reward choice (grantEvo).
   modalQueue.push({type:'v068EvoReward',tier:bossBefore?'boss':'elite'});
   if(!paused&&!ultimateState)setTimeout(()=>{if(!paused&&!ultimateState&&modalQueue.length)openNextModal()},120);
 };
@@ -3733,7 +3730,7 @@ if(_v069Virus){
   _v069Virus.apply=function(c,m){
     const free=c.base?.digital==='free';
     c.atk+=18+(c.base?.digital==='virus'?8:0)+(free?3.6:0);
-    c.virus++;c.ep=clamp(c.ep+20,0,999);if(c.virus%3===0)c.def-=2;
+    c.virus++;grantEvo(c,20,'card');if(c.virus%3===0)c.def-=2;
   };
 }
 const _v069Vaccine=cards.find(x=>x.id==='vaccine');
@@ -3743,7 +3740,7 @@ if(_v069Vaccine){
     const free=c.base?.digital==='free';
     c.atk+=10+(c.base?.digital==='vaccine'?8:0)+(free?2:0);
     const hpGain=100+(free?20:0);c.maxHp+=hpGain;c.hp+=hpGain;
-    c.vaccine++;c.ep=clamp(c.ep+20,0,999);
+    c.vaccine++;grantEvo(c,20,'card');
   };
 }
 const _v069Data=cards.find(x=>x.id==='data');
@@ -3752,7 +3749,7 @@ if(_v069Data){
   _v069Data.apply=function(c,m){
     const free=c.base?.digital==='free';
     c.atk+=6+(c.base?.digital==='data'?8:0)+(free?1.2:0);
-    c.agi+=12+(free?2.4:0);c.data++;c.ep=clamp(c.ep+20,0,999);
+    c.agi+=12+(free?2.4:0);c.data++;grantEvo(c,20,'card');
   };
 }
 const _v069Evo=cards.find(x=>x.id==='evo');
@@ -3893,7 +3890,7 @@ showEggModal=function(id){
   const duplicate=party.some(c=>v063BaseStarterFor(c)===id);
   const buildNew=(x,y)=>{
     ensureStarterLoadout(id);
-    if(id==='plotmon')ownedPassives.precocious=Math.max(3,ownedPassives.precocious||0);
+   
     const nc=v070InitPartnerProgress(mkChar(id));
     nc.x=x;nc.y=y;nc.ult=30;
     return nc;
@@ -3955,8 +3952,8 @@ v068ChooseEvoTarget=function(amount,tier){
   const box=$('#choices');box.className='choices';box.innerHTML='';
   for(const c of party){
     const need=v5EvoNeed(c),b=document.createElement('button');b.className='choice epic';
-    b.innerHTML=`<h3>${c.name}</h3><p>EVO ${Math.round(c.ep)}/${need} → ${Math.round(c.ep+amount)}/${need}</p><small>다른 동료에게는 EVO가 지급되지 않습니다.</small>`;
-    b.onclick=()=>{c.ep=clamp(c.ep+amount*(v107Has(c,'impmonGun')?1.5:1),0,999);effects.push({type:'reactionText',text:`EVO +${amount}`,x:c.x,y:c.y-48,t:.9,total:.9,color:'#78b7ff'});closeModal()};
+    b.innerHTML=`<h3>${c.name}</h3><p>EVO ${Math.round(c.ep)}/${need} → ${Math.round(c.ep+evoGainOf(c,amount,'reward'))}/${need}</p><small>다른 동료에게는 EVO가 지급되지 않습니다.</small>`;
+    b.onclick=()=>{const g=grantEvo(c,amount,'reward');effects.push({type:'reactionText',text:`EVO +${Math.round(g)}`,x:c.x,y:c.y-48,t:.9,total:.9,color:'#78b7ff'});closeModal()};
     box.appendChild(b);
   }
 };
@@ -4448,7 +4445,7 @@ showEggModal=function(id){
   const leader=activeChar(),leaderSlot=active;
   const finish=(preferred=null)=>{if(Number.isInteger(preferred)&&party[preferred])active=preferred;else if(leader&&!leader.dead&&leader.hp>0&&party.includes(leader))active=party[leaderSlot]===leader?leaderSlot:party.indexOf(leader);else v177KeepActive(activeChar());recruitResolving=false;closeModal()};
   const cardHTML=(title,sub='')=>`<div style="display:flex;align-items:center;gap:14px"><img src="${portrait}" style="width:88px;height:88px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))"><div><h3>${title}</h3><p><b>${m.role}</b><br>${m.desc}</p><small>${sub}</small></div></div>`;
-  const makeNew=(x,y)=>{ensureStarterLoadout(id);if(id==='plotmon')ownedPassives.precocious=Math.max(3,ownedPassives.precocious||0);const nc=v070InitPartnerProgress(mkChar(id));nc.x=x;nc.y=y;nc.ult=30;return nc};
+  const makeNew=(x,y)=>{ensureStarterLoadout(id);const nc=v070InitPartnerProgress(mkChar(id));nc.x=x;nc.y=y;nc.ult=30;return nc};
   if(party.length<3){
     $('#modalSub').textContent=duplicate?`${d.name}을(를) 별개의 새 동료로 영입합니다. 기존 동료의 진화·성장·스킬은 유지됩니다.`:`${d.name}을(를) 동료로 영입하거나 넘길 수 있습니다.`;
     const a=document.createElement('button');a.className='choice rare';a.innerHTML=cardHTML(`${d.name} 영입`,'새 개체 EVO 0 · 기존 동료 성장 유지');a.onclick=()=>{if(!$('#modal').classList.contains('show')||!box.contains(a))return;if(party.length>=3){showEggModal(id);return}const kept=party.slice(),q=leader&&kept.includes(leader)?leader:activeChar()||kept[0];if(!v181Recruit(null,()=>makeNew(q?q.x+45:WORLD.w/2,q?q.y+35:WORLD.h/2)))return;showMsg(`${d.name} 영입!`,1200);finish()};box.appendChild(a);
@@ -5173,7 +5170,7 @@ chooseTargetV3=function(p){
   V080_chooseTargetBase(p);
   if(typeof v080RewardBackRender!=='function')return;
   const box=$('#choices');if(!box)return;const back=document.createElement('button');back.className='choice ghost';back.style.cssText='border:2px solid #6bdcff;background:#13263a';back.innerHTML='<h3 style="color:#9eeaff">↩ 다른 보상 선택</h3><p>아직 보상을 적용하지 않고 이전 보상 목록으로 돌아갑니다.</p>';
-  back.onclick=()=>{v080RewardBackRender()};box.appendChild(back);
+  back.onclick=rwBackGuard(v080RewardBackRender);box.appendChild(back);
 };
 
 const V080_initGameBase=initGame;
@@ -5836,9 +5833,9 @@ for(const [id,name,desc] of [
  ['vaccine','백신 조각','E 스킬 피해/범위 증가 · EVO +20 · Vaccine +1']]){
  const card=cards.find(x=>x.id===id);if(card){card.name=name;card.desc=desc;card.tags=id==='data'?['data','basic','agility']:id==='vaccine'?['vaccine','skill']:['virus','attack'];}
 }
-cards.find(x=>x.id==='virus').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='virus'?1.35:1;c.atk+=24*multi;let penalty=Math.max(0,Math.min(c.base.def*.08,(c.base.def*.8)-(c.v091VirusPenalty||0)));c.def=Math.max(0,c.def-penalty);c.v091VirusPenalty=(c.v091VirusPenalty||0)+penalty;c.virus++;c.ep=clamp(c.ep+20,0,999)};
-cards.find(x=>x.id==='data').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='data'?1.35:1;v091Build(c).data+=multi;c.data++;c.ep=clamp(c.ep+20,0,999)};
-cards.find(x=>x.id==='vaccine').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='vaccine'?1.35:1;let b=v091Build(c);b.vaccinePower+=.16*multi;b.vaccineArea+=.10*multi;c.vaccine++;c.ep=clamp(c.ep+20,0,999);v091Refresh(c)};
+cards.find(x=>x.id==='virus').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='virus'?1.35:1;c.atk+=24*multi;let penalty=Math.max(0,Math.min(c.base.def*.08,(c.base.def*.8)-(c.v091VirusPenalty||0)));c.def=Math.max(0,c.def-penalty);c.v091VirusPenalty=(c.v091VirusPenalty||0)+penalty;c.virus++;grantEvo(c,20,'card')};
+cards.find(x=>x.id==='data').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='data'?1.35:1;v091Build(c).data+=multi;c.data++;grantEvo(c,20,'card')};
+cards.find(x=>x.id==='vaccine').apply=function(c){let multi=c.base?.digital==='free'?1.2:c.base?.digital==='vaccine'?1.35:1;let b=v091Build(c);b.vaccinePower+=.16*multi;b.vaccineArea+=.10*multi;c.vaccine++;grantEvo(c,20,'card');v091Refresh(c)};
 
 // Keep innate form speed, but separate the two investable speed axes.
 const V091_moveSpeedBase=moveSpeed;
@@ -7117,7 +7114,7 @@ chooseTargetV3=function(p){
  }
  if(typeof v080RewardBackRender==='function'){
   const back=document.createElement('button');back.className='choice ghost';
-  back.innerHTML='<h3>↩ 다른 보상 선택</h3>';back.onclick=()=>v080RewardBackRender();box.appendChild(back);
+  back.innerHTML='<h3>↩ 다른 보상 선택</h3>';back.onclick=rwBackGuard(v080RewardBackRender);box.appendChild(back);
  }
 };
 
@@ -7218,7 +7215,7 @@ V5_EVO.shawujinmon.push(['eldradimon','땅 + 체력 투자 합계 5회 이상',c
 const V10_evoOptionsBase=v5EvoOptions;
 v5EvoOptions=function(c){let a=V10_evoOptionsBase(c);for(const o of a){if(o.id==='rosemon'&&c.form==='lilamon'){o.ok=v10Pick(c,'nature')>=5;o.why='자연 강화 '+v10Pick(c,'nature')+'/5회'}if(o.id==='goldrapidmon')o.why='테리어몬 유지 · 필요 EVO '+v10EvoCost(c,o.id);if(o.id==='dinorexmon')o.why='디아트리몬 유지 · 필요 EVO '+v10EvoCost(c,o.id)}return a};
 function v10StageNeed(c,base){return Math.max(55,Math.round(base*(1-v5Mods(c).evoDiscount)))}
-function v10EvoCost(c,id){if(id==='goldrapidmon')return [80,135,180].reduce((s,x)=>s+v10StageNeed(c,x),0);if(id==='dinorexmon')return [135,180].reduce((s,x)=>s+v10StageNeed(c,x),0);return v5EvoNeed(c)}
+function v10EvoCost(c,id){return v5EvoNeed(c)}
 tryEvolution=function(){const c=activeChar();if(!c||c.dead)return;const opts=v5EvoOptions(c);if(!opts.length){showMsg('현재 진화 종착점입니다',900);return}
  paused=true;$('#modal').classList.add('show');$('#rerollBtn').style.display='none';$('#modalTitle').textContent='진화 분기 선택';$('#modalSub').textContent='EVO '+Math.round(c.ep)+' · 후보별 조건과 소모량을 확인하세요.';
  const box=$('#choices');box.className='choices';box.innerHTML='';for(const o of opts){const cost=v10EvoCost(c,o.id),can=o.ok&&c.ep>=cost,tr=V5_TRAITS[V5_FORM_TRAIT[o.id]],b=document.createElement('button');b.className='choice '+(can?'epic':'');b.disabled=!can;b.style.opacity=can?'1':'.57';b.innerHTML=`<img src="${v5Portrait(o.id)}" style="width:72px;height:72px;object-fit:contain;image-rendering:pixelated"><h3>${o.hidden&&!o.ok?'???':charDefs[o.id].name}</h3><p>${o.why||o.flavor||''}</p><small>EVO ${Math.round(c.ep)}/${cost} · ${can?'진화 가능':o.ok?'EVO 부족':'조건 미충족'} · ${tr?.name||'유산 없음'}</small>`;if(can)b.onclick=()=>{c.ep=Math.max(0,c.ep-cost);evolve(c,o.id);closeModal()};box.appendChild(b)}const cancel=document.createElement('button');cancel.className='choice ghost';cancel.innerHTML='<h3>↩ 돌아가기</h3>';cancel.onclick=closeModal;box.appendChild(cancel);if(typeof armChoiceInputLock==='function')armChoiceInputLock(800)
@@ -8510,7 +8507,7 @@ for(const id of ['virus','data','vaccine']){
   if(id==='data'){c.v104DataAttack=(c.v104DataAttack||0)+v.as*positive;c.v104DataMove=(c.v104DataMove||0)+v.ms*positive;c.v104DataCdr=(c.v104DataCdr||0)+v.cdr*positive;c.data+=v.points;v091Refresh(c)}
   if(id==='vaccine'){c.v104VaccineBasic=(c.v104VaccineBasic||0)+v.basic*positive;v091Build(c).vaccineArea+=v.area*positive;c.vaccine+=v.points;v091Refresh(c)}
   if(match)c.atk+=v.match;
-  c.ep=clamp(c.ep+20,0,999)
+  grantEvo(c,20,'card')
  }
 }
 const V104_recordInvestment=v051RecordInvestment;
@@ -9162,7 +9159,7 @@ showBuffModal=function(){V107_showReward();if(typeof v080RewardBackRender!=='fun
 const V107_targetBase=chooseTargetV3;
 function v107SpecialCount(c){let counts=v091Build(c).counts;return Object.keys(V091_PATHS).filter(key=>Number.isFinite(counts[key])&&counts[key]>0).length}
 function v107CanTakeSpecial(c,key){return !!c&&!c.dead&&Object.hasOwn(V091_PATHS,key)&&((v091Build(c).counts[key]||0)>0||v107SpecialCount(c)<4)}
-chooseTargetV3=function(p){if(p.card.id.startsWith('path_')){let key=p.card.id.slice(5),eligible=party.filter(c=>v107CanTakeSpecial(c,key));const box=$('#choices'),oldTitle=$('#modalTitle').textContent,oldSub=$('#modalSub').textContent,oldChoices=[...box.children];const back=typeof v080RewardBackRender==='function'&&oldTitle.startsWith('레벨업')?()=>v080RewardBackRender():()=>{box.innerHTML='';oldChoices.forEach(node=>box.appendChild(node));$('#modalTitle').textContent=oldTitle;$('#modalSub').textContent=oldSub;$('#rerollBtn').style.display='none'};v107Modal(p.card.name+' · 적용 대상','서로 다른 특화는 디지몬당 최대 4종입니다.',eligible.map(c=>({name:c.name,desc:`특화 ${v107SpecialCount(c)}/4종`,grade:p.rar,action:()=>{v068ApplyRewardCardTo(c,p);v080RewardBackRender=null;closeModal()}})),back);return}V107_targetBase(p)};
+chooseTargetV3=function(p){if(p.card.id.startsWith('path_')){let key=p.card.id.slice(5),eligible=party.filter(c=>v107CanTakeSpecial(c,key));const box=$('#choices'),oldTitle=$('#modalTitle').textContent,oldSub=$('#modalSub').textContent,oldChoices=[...box.children];const back=typeof v080RewardBackRender==='function'&&oldTitle.startsWith('레벨업')?rwBackGuard(v080RewardBackRender):()=>{box.innerHTML='';oldChoices.forEach(node=>box.appendChild(node));$('#modalTitle').textContent=oldTitle;$('#modalSub').textContent=oldSub;$('#rerollBtn').style.display='none'};v107Modal(p.card.name+' · 적용 대상','서로 다른 특화는 디지몬당 최대 4종입니다.',eligible.map(c=>({name:c.name,desc:`특화 ${v107SpecialCount(c)}/4종`,grade:p.rar,action:()=>{v068ApplyRewardCardTo(c,p);v080RewardBackRender=null;closeModal()}})),back);return}V107_targetBase(p)};
 const v107OldUlt=cards.find(x=>x.id==='ultDamage');
 if(v107OldUlt){v107OldUlt.id='path_ultDamage';v107OldUlt.name='궁극기 피해 강화';v107OldUlt.desc='Q 피해 +45/70/105/150% · Q 충전 효율 −20/26/31/38%';V091_PATHS.ultDamage={name:v107OldUlt.name,desc:v107OldUlt.desc,tags:v107OldUlt.tags};let apply=v107OldUlt.apply;v107OldUlt.apply=function(c,m,rar){apply(c,m,rar);c.v107UltChargePenalty=(c.v107UltChargePenalty||0)+({common:.25,rare:.35,epic:.45,legendary:.60}[rar]||.25);let b=v091Build(c);b.counts.ultDamage=(b.counts.ultDamage||0)+1}};
 // Specialization descriptions and penalties match the current damage pipeline.
@@ -9576,7 +9573,7 @@ const V109_draw=draw;
 draw=function(){V109_draw();if(!v109Merchant||state!=='playing')return;const m=v109Merchant,sx=W/2+(m.x-camera.x)*camera.zoom,sy=H/2+(m.y-camera.y)*camera.zoom;
  ctx.save();if(sx>=0&&sx<=W&&sy>=0&&sy<=H){if(v109MerchantImg.complete&&v109MerchantImg.naturalWidth){ctx.imageSmoothingEnabled=false;drawGroundShadow(sx,sy+14,v109MerchantImg,76);drawSpriteWithOutline(v109MerchantImg,sx-38,sy-62,76,76)}ctx.fillStyle='#ffe592';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText('상인 · 접촉',sx,sy-68)}else{const x=clamp(sx,28,W-28),y=clamp(sy,28,H-28);ctx.fillStyle='#ffe592';ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.fill();ctx.fillStyle='#283c52';ctx.textAlign='center';ctx.font='bold 16px sans-serif';ctx.fillText('➜',x,y+5)}ctx.restore()};
 const V109_evoReward=cards.find(x=>x.id==='evo');
-if(V109_evoReward){V109_evoReward.desc='진화포인트 +15/30/55/90';V109_evoReward.apply=(c,m,r)=>{let n={common:15,rare:30,epic:55,legendary:90}[r]||15;c.ep=clamp(c.ep+n*(v107Has(c,'impmonGun')?1.5:1),0,999)}}
+if(V109_evoReward){V109_evoReward.desc='진화포인트 +15/30/55/90';V109_evoReward.apply=(c,m,r)=>{let n={common:15,rare:30,epic:55,legendary:90}[r]||15;grantEvo(c,n,'card')}}
 cards.push({id:'gold',cat:'general',name:'골드',desc:'공용 골드 +30/70/150/300',tags:[],global:true,apply:()=>{}});
 const V109_eligibleCards=eligibleBaseCards;
 eligibleBaseCards=function(cat,c){const a=V109_eligibleCards(cat,c);if(cat==='general'&&V109_evoReward&&!a.some(x=>x.id==='evo'))a.push(V109_evoReward);return a};
@@ -9598,7 +9595,7 @@ function v109aBuyEgg(s,done){
  const d=charDefs[s.id];if(!d)return v107ShowShop();
  const base=v063BaseStarterFor,duplicate=party.some(c=>base(c)===s.id);
  const recruit=(old,i)=>{
-  ensureStarterLoadout(s.id);if(s.id==='plotmon')ownedPassives.precocious=Math.max(3,ownedPassives.precocious||0);
+  ensureStarterLoadout(s.id);
   const c=v070InitPartnerProgress(mkChar(s.id)),a=old||activeChar();c.x=a?.x??WORLD.w/2;c.y=a?.y??WORLD.h/2;c.ult=30;
   if(i==null)party.push(c);else{if(old?.v107Relics?.length)for(const relic of [...old.v107Relics])v107Stash.push({owner:old,relic});party[i]=c}
   showMsg(d.name+' 영입!',1200);done()
@@ -11177,9 +11174,7 @@ const V011_atkRate=atkRate;
 atkRate=function(c){if(!c?.v011Ready)return V011_atkRate(c);return V011_atkRate(c)};
 const V011_v115DurationMul=v115DurationMul;
 v115DurationMul=function(c){if(!c?.v011Ready)return V011_v115DurationMul(c);return 1+Math.min(2,v115DurationBonus(c)+v011Bonuses(c).duration)};
-const V011_v5EvoNeed=v5EvoNeed;
-v5EvoNeed=function(c){if(!c?.v011Ready)return V011_v5EvoNeed(c);let early=v011TraitState(c).early;if(!early)return V011_v5EvoNeed(c);return Math.max(65,Math.round(100*(1-[.10,.15,.20,.25][early-1])))};
-evoNeed=v5EvoNeed;
+// v0.18.5: the early-evolution (조숙) passive no longer lowers the EVO requirement; it raises EVO gains (grantEvo).
 
 // Elemental points are damage points, not evolution investment records.
 const V011_calcWithSpecial=calc;
@@ -11429,7 +11424,7 @@ const V011_PASSIVE_DETAIL={
  hope:l=>`10레벨마다 빛 투자 +${l}점, 영역 확장 메리트 +${l}점 (E 면적).`,
  gallop:l=>`10레벨마다 바람 투자 +${[2,3,4][l-1]}점. 이동속도 +${[5,15,40][l-1]}% (상시).`,
  glutton:l=>`10레벨마다 어둠 투자 +${[2,3,4][l-1]}점. 직접 피해 흡혈 ${[10,15,30][l-1]}%.`,
- early:l=>`진화 포인트 요구량 −${[10,15,20,25][l-1]}%. 궁극체 도달 시 빛 투자 +10점.`,
+ early:l=>`진화 에너지(EVO) 획득량 +${[10,15,20,25][l-1]}%. 궁극체 도달 시 빛 투자 +10점.`,
  wicked:l=>`직접 타격한 적에게 5초간 주는 피해·받는 피해 각각 +${[10,20][l-1]}%.`,
  ancient:()=>`진화할 때마다 공격력 메리트 +2점 (영구, 디메리트 없음).`,
  dragonwing:l=>`10레벨마다 스킬 과충전 메리트 +${[1,2,2][l-1]}점 (E 피해).`,
@@ -11567,7 +11562,7 @@ stopBGM=function(){reMusic.token++;reDispose(reMusic.current);reDispose(reMusic.
 startFieldBGM=function(){const group=Math.max(1,Math.min(4,(v06Run.layer||1)-1));if(reMusic.mode==='field'&&reMusic.group===group&&reMusic.current&&!reMusic.current.ended){if(reMusic.current.paused)reMusic.current.play().catch(()=>{});return}stopBGM();reMusic.group=group;reMusic.mode='field';rePlay(new Audio(rePick(group)),reMusic.token,'field');rePrepare(group)};
 startBossBGM=function(){if(v06Run.bossId==='monzaemon'||v06Run.bossId==='myotismon')return startFieldBGM();const path=v06Run.bossId==='yggdrasil'?'assets/audio/bgm_yigdrashil.mp3':'assets/audio/bgm_boss_run.mp3';if(reMusic.mode==='boss'&&reMusic.current?.src.endsWith(path))return;stopBGM();reMusic.mode='boss';rePlay(new Audio(path),reMusic.token,'boss')};
 function reEvoMusic(){const current=reMusic.current;if(!current)return;reDispose(reMusic.jingle);const j=new Audio('assets/audio/bgm_evo.mp3');reMusic.jingle=j;current.volume=vAudioMusicVolume(.16);j.volume=vAudioMusicVolume(.82);j.loop=false;const done=()=>{if(reMusic.jingle===j){reMusic.jingle=null;if(reMusic.current)reMusic.current.volume=vAudioMusicVolume(.8)}reDispose(j)};j.onended=j.onerror=done;j.play().catch(done)}
-const RE_evolve=evolve;evolve=function(c,id){const old=c?.form,ret=RE_evolve(c,id);if(c&&old!==c.form){c.hp=c.maxHp;if(state==='playing'&&!v102Demo?.active)reEvoMusic()}return ret};
+const RE_evolve=evolve;evolve=function(c,id){const old=c?.form,ret=RE_evolve(c,id);if(c&&old!==c.form){c.hp=c.maxHp;if(state==='playing'&&!evoQuiet)reEvoMusic()}return ret};
 const RE_DAMAGE=[1,1.4,2,2.8,4];function reEnemyFactor(t){return RE_DAMAGE[Math.min(4,Math.max(0,Math.floor(t/180)))]}
 const RE_hit=playerHit;playerHit=function(c,raw,src){if(reDialogue)return;const e=src?.owner||src,hostile=src?.enemy===true||e?.v06BossId||['boss','elite','melee','ranged','charger'].includes(e?.kind);return RE_hit(c,hostile?raw*reEnemyFactor(v06Run.time||0):raw,src)};
 const reOverlay=document.getElementById('storyDialogue'),reSpeaker=document.getElementById('storySpeaker'),reText=document.getElementById('storyText');let reDialogue=null,reSeen={};
@@ -11616,7 +11611,6 @@ Object.assign(V011_PASSIVE_DETAIL,{
  cyborg:()=>`10레벨마다 공격력 +2.`,
  skyRuler:()=>`1초마다 주변 적에게 예고 낙뢰. 궁극기 사용 시 7초간 0.5초 간격.`
 });
-const V013_COST={bancholeomon:[135,180],saberleomon:[135,180],iceleomon:[135],azulongmon:[135,180]};
 for(const [id,s] of Object.entries(V013_FORMS)){
  charDefs[id]={name:s[0],hp:s[1],atk:s[2],def:s[3],agi:s[4],attackCd:s[5],range:s[6],scale:s[7],digital:s[8],melee:s[9],arc:s[9]?1.55:0,
   physical:s[9]?s[2]:50,fire:s[10].includes('fire')?s[2]:0,cold:s[10].includes('cold')?s[2]:0,
@@ -11652,8 +11646,6 @@ Object.assign(V5_EVO,{
 const V013_baseStarterFor=baseStarterFor;
 baseStarterFor=function(c){const f=c?.form||c;return ['elecmon','leomon','bancholeomon','saberleomon','iceleomon'].includes(f)?'elecmon':
  V013_IDS.has(f)?'betamon':V013_baseStarterFor(c)};
-const V013_evoCost=v10EvoCost;
-v10EvoCost=function(c,id){if(V013_COST[id])return V013_COST[id].reduce((sum,stage)=>sum+v10StageNeed(c,stage),0);return V013_evoCost(c,id)};
 // The identity is the union of every attribute used along the lineage.  It is
 // a damage investment pool; the actual status applied is specified per hit.
 // For older forms, build the union from their evolution graph in stage order.
@@ -12305,7 +12297,7 @@ v107ShopMoment=function(){const moment=v107NextMerchant;v107NextMerchant=moment=
 const V014_eligible=eligibleBaseCards;
 eligibleBaseCards=function(cat,c){return V014_eligible(cat,c).filter(card=>card.id!=='evo'||party.some(member=>!member.dead&&(V5_EVO[member.form]||[]).length>0))};
 const V014_chooseTarget=chooseTargetV3;
-chooseTargetV3=function(p){if(p.card.id==='evo'){const eligible=party.filter(c=>!c.dead&&(V5_EVO[c.form]||[]).length>0),back=typeof v080RewardBackRender==='function'?v080RewardBackRender:null;v107Modal(p.card.name+' · 적용 대상','최종 진화체는 진화포인트를 받을 수 없습니다.',eligible.map(c=>({name:c.name,grade:p.rar,desc:`EVO ${Math.round(c.ep)}/${v5EvoNeed(c)}`,action:()=>{v068ApplyRewardCardTo(c,p);v080RewardBackRender=null;closeModal()}})),back);return}V014_chooseTarget(p);if(!V109_ELEMENTS.includes(p.card.id))return;const buttons=[...$('#choices').querySelectorAll('button.choice:not(.ghost)')];buttons.forEach((b,i)=>{const c=party[i];if(!c)return;const small=document.createElement('small');small.textContent='사용속성: '+v013Attrs(c).map(x=>V014_ELEMENT_NAMES[x]).join(' + ');b.appendChild(small)})};
+chooseTargetV3=function(p){if(p.card.id==='evo'){const eligible=party.filter(c=>!c.dead&&(V5_EVO[c.form]||[]).length>0),back=typeof v080RewardBackRender==='function'?rwBackGuard(v080RewardBackRender):null;v107Modal(p.card.name+' · 적용 대상','최종 진화체는 진화포인트를 받을 수 없습니다.',eligible.map(c=>({name:c.name,grade:p.rar,desc:`EVO ${Math.round(c.ep)}/${v5EvoNeed(c)}`,action:()=>{v068ApplyRewardCardTo(c,p);v080RewardBackRender=null;closeModal()}})),back);return}V014_chooseTarget(p);if(!V109_ELEMENTS.includes(p.card.id))return;const buttons=[...$('#choices').querySelectorAll('button.choice:not(.ghost)')];buttons.forEach((b,i)=>{const c=party[i];if(!c)return;const small=document.createElement('small');small.textContent='사용속성: '+v013Attrs(c).map(x=>V014_ELEMENT_NAMES[x]).join(' + ');b.appendChild(small)})};
 for(const id of V109_ELEMENTS){const card=cards.find(x=>x.id===id);if(card){card.name=V014_ELEMENT_NAMES[id]+' 공격력';card.desc=`${V014_ELEMENT_NAMES[id]} 공격력 투자점수 +1/2/3/4`}}
 Object.assign(V091_PATHS,{strong:{...V091_PATHS.strong,name:'[특화]기본 공격력 증가'},rapid:{...V091_PATHS.rapid,name:'[특화]기본 공격속도 증가'},giant:{...V091_PATHS.giant,name:'[특화]기본 공격 범위 증가'},overcharge:{...V091_PATHS.overcharge,name:'[특화]스킬 피해 증가'},area:{...V091_PATHS.area,name:'[특화]스킬 범위 증가'},spam:{...V091_PATHS.spam,name:'[특화]스킬 쿨다운 감소'},ultimate:{...V091_PATHS.ultimate,name:'[특화]궁극기 충전효율 증가'},mobility:{...V091_PATHS.mobility,name:'[특화]이동속도 증가'},attack:{...V091_PATHS.attack,name:'[특화]공격력 증가'},ultDamage:{...V091_PATHS.ultDamage,name:'[특화]궁극기 피해 증가'}});
 const V014_SPECIAL_DESC={strong:'기본공격 피해가 증가하고 공격속도가 감소합니다.',rapid:'기본공격 속도가 증가하고 기본공격 피해가 감소합니다.',giant:'기본공격 범위가 증가하고 스킬 범위가 감소합니다.',overcharge:'E 스킬 피해가 증가하고 재사용 대기시간이 늘어납니다.',area:'스킬 범위가 증가하고 기본공격 범위가 감소합니다.',spam:'스킬 쿨다운이 감소하고 스킬 피해가 감소합니다.',ultimate:'궁극기 충전효율이 증가하고 궁극기 피해가 감소합니다.',mobility:'이동속도가 증가하고 공격력이 감소합니다.',attack:'공격력이 증가하고 이동속도가 감소합니다.',ultDamage:'궁극기 피해가 증가하고 궁극기 충전효율이 감소합니다.'};
@@ -13526,19 +13518,19 @@ v073UltSpec=function(c){if(!V15_SUPER[c?.form])return V15_ultSpec(c);const d=dir
 const V15_stageCost={1:80,2:135,3:180,4:400};
 function v15Devolve(c,index,to){
  if(!c||!party.includes(c)||c.dead||!party.includes(to)||to===c)return;
- const history=c.v014History||[c.form],at=history.indexOf(index);if(at<0||at===history.length-1)return;
+ const route=rtPath(c),at=route.indexOf(index);if(at<0||at===route.length-1)return;
  const current=V014_STAGE[c.form]??0,target=V014_STAGE[index]??0;
  let grant=0;for(let n=current;n>target;n--)grant+=V15_stageCost[n]||0;
  if(grant<=0)return;
- const keep=history.slice(0,at+1),attrs=new Set();for(const form of keep)for(const el of v013LineageIdentity(form))attrs.add(el);
+ const prior=c.v014History||[c.form],keep=prior.filter(f=>{const k=route.indexOf(f);return k>=0&&k<=at});if(keep[keep.length-1]!==index)keep.push(index);const attrs=new Set();for(const form of keep)for(const el of v013LineageIdentity(form))attrs.add(el);
  const bonus=c.v15InheritedHistory,ep=c.ep;
  evolve(c,index);c.v014History=keep;c.v014Attrs=[...attrs];c.v15InheritedHistory=bonus;c.ep=ep;
  c.v15ComboT=0;c.v15SwordT=0;c.skillCd=0;c.hp=Math.min(c.hp,c.maxHp);
- to.ep=(to.ep||0)+grant;v091Refresh(c);showMsg(`${c.name} 퇴화 · ${to.name}에게 EVO ${grant} 양도`,1800);renderStatus()
+ grantEvo(to,grant,'transfer');v091Refresh(c);showMsg(`${c.name} 퇴화 · ${to.name}에게 EVO ${grant} 양도`,1800);renderStatus()
 }
 const V15_renderStatus=renderStatus;
 renderStatus=function(){V15_renderStatus();const cards=[...document.querySelectorAll('#statusGrid .statusCard')];party.forEach((c,i)=>{
- const history=c.v014History||[c.form],list=history.slice(0,-1).filter((id,j)=>V014_STAGE[id]<(V014_STAGE[c.form]??0));if(!list.length)return;
+ const list=rtPath(c).slice(0,-1).filter(id=>V014_STAGE[id]<(V014_STAGE[c.form]??0));if(!list.length)return;
  const card=cards[i];if(!card)return;const b=document.createElement('button');b.className='equipBtn';b.textContent='퇴화 · 진화포인트 양도';b.onclick=()=>{
   const targets=party.filter(p=>p!==c&&!p.dead);if(!targets.length){showMsg('진화포인트를 받을 동료가 필요합니다',1200);return}
   $('#statusOverlay').classList.remove('show');statusOpen=false;
@@ -20848,8 +20840,6 @@ const RG_cond=v051Cond;
 v051Cond=function(c,id){const req={icemon:['cold',3,'냉기 공격력'],insekimon:['attack',4,'공격력 옵션'],mekanorimon:['virus',3,'바이러스']}[id];if(req&&RG_ALL.has(c?.form)){const n=rgInvest(c,req[0]);return{ok:n>=req[1],text:`${req[2]} 투자 ${n}/${req[1]} 이상`}}return RG_cond(c,id)};
 const RG_options=v5EvoOptions;
 v5EvoOptions=function(c){if(!RG_ALL.has(c?.form))return RG_options(c);return(V5_EVO[c.form]||[]).map(([id,why])=>{const cond=v051Cond(c,id);const special=['icemon','insekimon','mekanorimon'].includes(id);return{id,ok:special?cond.ok:true,why:special?cond.text:why}})};
-const RG_cost=v10EvoCost;
-v10EvoCost=function(c,id){return c?.form==='gottsumon'&&id==='insekimon'?v10StageNeed(c,80)+v10StageNeed(c,135):RG_cost(c,id)};
 const RG_root=baseStarterFor;
 baseStarterFor=function(c){const id=c?.form||c;return RG_ALL.has(id)?RG_ROCK.includes(id)?'gottsumon':'hagurumon':RG_root(c)};
 const RG_portrait=v5Portrait;
@@ -22128,7 +22118,7 @@ V011_PASSIVE_DETAIL["night"]=()=>"10레벨마다 바람 0.75/1/1.25/1.5 · 자�
 V011_PASSIVE_DETAIL["burning"]=()=>"10레벨마다 화염 0.75/1/1.25/1.5 · 자동 투자 자체가 딜 패시브";
 V011_PASSIVE_DETAIL["waterKing"]=()=>"10레벨마다 냉기 0.75/1/1.25/1.5 · 자동 투자 자체가 딜 패시브";
 V011_PASSIVE_DETAIL["sacred"]=()=>"10레벨마다 바람 1.25 · 자동 투자 자체가 딜 패시브";
-V011_PASSIVE_DETAIL["early"]=()=>"궁극체 도달 시 빛 +3점 · 진화포인트 요구량 -10/15/20/25%";
+V011_PASSIVE_DETAIL["early"]=()=>"궁극체 도달 시 빛 +3점 · EVO 획득량 +10/15/20/25%";
 V011_PASSIVE_DETAIL["omegaBond"]=()=>"화염·냉기 각각 +3점 · 양쪽 진화 이력·로얄나이츠 효과가 함께 적용 가능";
 V011_PASSIVE_DETAIL["primal"]=()=>"처음 도달한 진화 단계마다 화염 +1점 · 계승된 청/녹 계통의 부가 패시브와 합산";
 V011_PASSIVE_DETAIL["roots"]=()=>"10레벨당 공격력 메리트 0.5/0.75/1 · 자동 공격력 메리트 자체가 딜 패시브";
@@ -22175,7 +22165,7 @@ function v180TreeSprite(){
 // v0.18.0f: detached miracle records and transactional recruitment protection.
 // Only scalar/collection growth data crosses into resurrection records. No live
 // character, enemy, projectile, channel, DOM, or animation references are saved.
-const V181_GROWTH=('id form name base maxHp atk def agi physical fire cold nature electric wind earth light dark virus vaccine data ep attackRangeBonus skillRangeBonus cdr attackSpeedBonus crit burnBonus sporeBonus dashStrikeBonus ultGainBonus uniqueSet cardStacks equipSub equipPassive passive heritage _v5Applied invest aff mods statusEnchant elementMod elementModLv v10QBonus v10MovePenalty v10Picks v011Root v011Ready v011LastN v011VeemonEvolves v011WormmonEvolves v011DracoEvolves v011AreaExtra v011OriginalHp v091 v091Area v091VirusPenalty v107OldArea v107OldRange v107AreaPenalty v107GiantPenalty v107Relics v107Vital v107DashMax v107UltChargePenalty v108AttackPower v109ElementPoints v109Berserker v109DashBreaker v014Attrs v014History v15InheritedHistory memoryBuild _memoryApplied picoDarkBonus r173AtkFactor r173Profile r173FusionElements v013BeastPower v013CyberApplied v104DataAttack v104DataCdr v104DataMove v104VaccineBasic v104VirusTaken v110PredatorKills v113PredatorApplied v113PredatorBaseCdr v115DurationBonus v180PeakStage').split(' ');
+const V181_GROWTH=('id form name base maxHp atk def agi physical fire cold nature electric wind earth light dark virus vaccine data ep attackRangeBonus skillRangeBonus cdr attackSpeedBonus crit burnBonus sporeBonus dashStrikeBonus ultGainBonus uniqueSet cardStacks equipSub equipPassive passive heritage _v5Applied invest aff mods statusEnchant elementMod elementModLv v10QBonus v10MovePenalty v10Picks v011Root v011Ready v011LastN v011VeemonEvolves v011WormmonEvolves v011DracoEvolves v011AreaExtra v011OriginalHp v091 v091Area v091VirusPenalty v107OldArea v107OldRange v107AreaPenalty v107GiantPenalty v107Relics v107Vital v107DashMax v107UltChargePenalty v108AttackPower v109ElementPoints v109Berserker v109DashBreaker v014Attrs v014History v15InheritedHistory memoryBuild _memoryApplied picoDarkBonus r173AtkFactor r173Profile r173FusionElements v013BeastPower v013CyberApplied v104DataAttack v104DataCdr v104DataMove v104VaccineBasic v104VirusTaken v110PredatorKills v113PredatorApplied v113PredatorBaseCdr v115DurationBonus v180PeakStage routePath peakPath routeKind').split(' ');
 const V181_PROTECTED=[...V181_GROWTH,'hp','dead','ult','skillCd','subCd','atkCd','eCharges','eChargeTimer','dash','dashTimer','x','y'];
 let v181Slots=[],v181Expected=[],v181Serial=0,v181Keys=new WeakMap(),v181Busy=0,v181Clock=0,v181Diagnostics=[];
 function v181Key(c){if(!v181Keys.has(c))v181Keys.set(c,++v181Serial);return v181Keys.get(c)}
@@ -22307,7 +22297,7 @@ function rhId(c){return c&&rhIds.get(c)}
 function rhLive(){return !!rhRun&&!rhRun.endedAt&&!rhStarting&&!rhPractice}
 function rhForm(c){return {id:rhId(c),form:c.form,name:charDefs[c.form]?.name||c.name}}
 function rhTeam(){return party.map(rhForm)}
-function rhBuild(c){return {form:c.form,name:charDefs[c.form]?.name||c.name,ep:c.ep,hp:c.hp,maxHp:c.maxHp,atk:c.atk,def:c.def,history:[...(c.v014History||[c.form])],elements:v181Copy(c.v109ElementPoints||{}),investment:v181Copy(c.invest||{}),special:v181Copy(c.v091||{}),memory:v181Copy(c.memoryBuild||null),relics:v181Copy(c.v107Relics||[]),sub:c.equipSub||null,heritage:v181Copy(c.heritage||{})}}
+function rhBuild(c){return {form:c.form,name:charDefs[c.form]?.name||c.name,ep:c.ep,hp:c.hp,maxHp:c.maxHp,atk:c.atk,def:c.def,history:[...(c.v014History||[c.form])],route:[...(c.routePath||[])],peak:[...(c.peakPath||[])],routeKind:c.routeKind||'',elements:v181Copy(c.v109ElementPoints||{}),investment:v181Copy(c.invest||{}),special:v181Copy(c.v091||{}),memory:v181Copy(c.memoryBuild||null),relics:v181Copy(c.v107Relics||[]),sub:c.equipSub||null,heritage:v181Copy(c.heritage||{})}}
 function rhMember(c,status){const id=rhId(c);if(!rhRun||!id)return;const m=rhRun.members[id];m.build=rhBuild(c);if(status)m.status=status}
 function rhEnroll(c,status='active'){
  if(rhId(c))return rhId(c);const id=++rhSeq;rhIds.set(c,id);
@@ -22722,6 +22712,209 @@ update=function(dt){const r=DS_update(dt);dsTick(dt);return r};
 const DS_init=initGame;
 initGame=function(...args){dsReset();return DS_init(...args)};
 RH_NAMES.restore='복구';
+// v0.18.4 (stage 3): per-individual route. routePath = assumed/actual lineage from the starting rookie to the
+// current form (devolve candidates read it); peakPath = highest route reached (miracle/critical devolve use it).
+// v014History stays the source of passive levels, so passives of a purchased form are unchanged until it devolves.
+const RT_KINDS={regular:'정규 루트',chosen:'지정 루트',unknown:'경로 불명'};
+const rtCache=new Map();
+const rtRnd=()=>{try{return crypto.getRandomValues(new Uint32Array(1))[0]/4294967296}catch(e){return Math.random()}};
+function rtAll(form){
+ if(rtCache.has(form))return rtCache.get(form);
+ const out=[];
+ for(const root of STARTER_IDS){
+  const walk=path=>{
+   if(out.length>=40)return;
+   const at=path[path.length-1];
+   if(at===form){out.push(path);return}
+   if(path.length>=7)return;
+   for(const e of V5_EVO[at]||[])if(charDefs[e[0]]&&!path.includes(e[0]))walk([...path,e[0]])
+  };
+  walk([root])
+ }
+ rtCache.set(form,out);return out
+}
+// Regular route: every step is the first branch of its parent. Anything else is chosen once, at random, and stored.
+function rtPick(form){
+ const all=rtAll(form);
+ if(!all.length)return {path:[form],kind:'unknown'};
+ const regular=all.find(p=>p.every((id,i)=>i===p.length-1||V5_EVO[id]?.[0]?.[0]===p[i+1]));
+ if(regular)return {path:regular.slice(),kind:'regular'};
+ return {path:all[Math.floor(rtRnd()*all.length)].slice(),kind:'chosen'}
+}
+function rtAssign(c){
+ if(!c||typeof c!=='object'||c.routePath||!c.form)return c;
+ const r=rtPick(c.form);c.routePath=r.path;c.peakPath=r.path.slice();c.routeKind=r.kind;return c
+}
+function rtPath(c){
+ rtAssign(c);const p=c.routePath;
+ if(p[p.length-1]!==c.form){const i=p.lastIndexOf(c.form);c.routePath=i>=0?p.slice(0,i+1):[...p,c.form]}
+ return c.routePath
+}
+function rtCanDevolve(c){return c.routeKind!=='unknown'&&rtPath(c).length>1}
+function rtPeak(c){const pk=c.peakPath||[],last=pk[pk.length-1];if(!pk.length||(V014_STAGE[c.form]??0)>(V014_STAGE[last]??0))c.peakPath=c.routePath.slice()}
+function rtMove(c,before){
+ if(!c.routePath){rtAssign(c);return}
+ const p=c.routePath,i=p.lastIndexOf(c.form);
+ if(i>=0)c.routePath=p.slice(0,i+1);
+ else{const j=p.lastIndexOf(before);c.routePath=(j>=0?p.slice(0,j+1):p.slice()).concat(c.form)}
+ rtPeak(c)
+}
+const RT_mkChar=mkChar;
+mkChar=function(id){return rtAssign(RT_mkChar(id))};
+const RT_evolve=evolve;
+evolve=function(c,...args){const before=c?.form,r=RT_evolve(c,...args);if(c&&before&&c.form!==before)rtMove(c,before);return r};
+// v0.18.5 (stage 4): one place for every EVO grant and one rule for the EVO cost of stage-skipping evolutions.
+// Early evolution (조숙, Plotmon line): +10/15/20/25% EVO gained by level; the requirement stays at list price.
+// Transfers (devolve) and restores are not rewards: no relic or passive multiplier applies to them.
+const EVO_EXEMPT=new Set(['transfer','fusion','restore']);
+function evoGainBonus(c){let lv=0;try{lv=c?.v011Ready?(v011TraitState(c).early||0):0}catch(e){}return lv?[.10,.15,.20,.25][Math.min(4,lv)-1]:0}
+function evoGainOf(c,amount,source='reward'){
+ if(EVO_EXEMPT.has(source))return amount;
+ return amount*(typeof v107Has==='function'&&v107Has(c,'impmonGun')?1.5:1)*(1+evoGainBonus(c))
+}
+function grantEvo(c,amount,source='reward'){
+ if(!c||!(amount>0))return 0;
+ const gained=evoGainOf(c,amount,source),before=c.ep||0;
+ c.ep=EVO_EXEMPT.has(source)?before+gained:Math.max(before,clamp(before+gained,0,999)); // a grant never lowers EVO (transfer can leave it above 999)
+ drNote('evo',{id:rhId(c)||0,form:c.form,source,amount:Math.round(amount*10)/10,gained:Math.round((c.ep-before)*10)/10});
+ return c.ep-before
+}
+// Cards give EVO through grantEvo directly (virus / vaccine / data / evo); no grant-and-restore.
+// Stage-difference cost: skipping stages costs the sum of every stage passed (80 / 135 / 180 / 400). Impmon keeps its own price.
+function evoStageCost(c,id){
+ if(!c||c.form==='impmon')return null;
+ const s=V014_STAGE[c.form],t=V014_STAGE[id];
+ if(typeof s!=='number'||typeof t!=='number'||t<=s+1)return null;
+ let sum=0;for(let n=s+1;n<=t;n++)sum+=V15_stageCost[n]||0;return sum
+}
+const EV_trial=v102StartTrial;
+v102StartTrial=function(...args){evoQuiet++;try{return EV_trial(...args)}finally{evoQuiet--}};
+const EV_cost=v10EvoCost;
+v10EvoCost=function(c,id){const k=evoStageCost(c,id);return k==null?EV_cost(c,id):k};
+
+// ===== v0.18.6: lethal devolve / downed state =====
+// HP 0 on a member with a lower form on its route -> devolve to the rookie, keep EVO, HP 50%, 1 s invulnerable.
+// No lower form (rookie / unknown route) -> downed: grey, stays in place, cannot be tagged, revived by healing to 50%.
+// All members downed -> game over (the miracle relic revives through the existing path).
+RH_NAMES.downed='전투불능';RH_NAMES.revive='전투 복귀';
+const ldDown=new WeakSet(),ldPos=new WeakMap();
+function ldTarget(c){
+ if(!c||!party.includes(c)||!rtCanDevolve(c))return null;
+ const t=rtPath(c)[0];
+ return t&&t!==c.form&&charDefs[t]&&(V014_STAGE[t]??0)<(V014_STAGE[c.form]??0)?t:null
+}
+function ldDevolve(c,target){
+ const route=rtPath(c),at=route.indexOf(target),from=c.form,before=rhTeam();
+ const prior=c.v014History||[c.form],keep=prior.filter(f=>{const k=route.indexOf(f);return k>=0&&k<=at});if(keep[keep.length-1]!==target)keep.push(target);
+ const attrs=new Set();for(const f of keep)for(const el of v013LineageIdentity(f))attrs.add(el);
+ const bonus=c.v15InheritedHistory,ep=c.ep,x=c.x,y=c.y;
+ drMarkEvolve(c);evoQuiet++;const priorState=state;state='preparing'; // no evolution cinematic / jingle in the middle of combat
+ try{
+  drCommand('lethal-devolve',[c],()=>{
+   evolve(c,target);c.v014History=keep;c.v014Attrs=[...attrs];c.v15InheritedHistory=bonus;c.ep=ep;
+   c.v15ComboT=0;c.v15SwordT=0;c.skillCd=0;c.dead=false;c.v063RemovalPending=false;c.knockVx=c.knockVy=0;c.dashMove=null;
+   c.hp=Math.max(1,c.maxHp*.5);c.tagInv=Math.max(c.tagInv||0,1);c.hitFlash=.3;c.x=x;c.y=y;v091Refresh(c)
+  },{mode:'lethal',from,to:target})
+ }finally{evoQuiet--;if(state==='preparing')state=priorState}
+ drMarkEvolve(c);v181Save(c);
+ effects.push({type:'burst',x:c.x,y:c.y,r:120,t:.4,color:'#ffd27a'});
+ showMsg(`${charDefs[from]?.name||from} 치명 퇴화 → ${charDefs[target].name}`,1400);
+ if(rhLive()){rhMember(c);rhEvent('devolve',[rhId(c)].filter(Boolean),{mode:'lethal',changes:[{id:rhId(c),from,to:target,ep:[Math.round(ep),Math.round(c.ep)]}]},before)}
+}
+function ldAllDown(){
+ for(const p of party)v181Save(p);
+ state='gameover';stopBGM();showMsg('GAME OVER',4000);vPatchStartGameover()
+}
+function ldDownMember(c){
+ const x=c.x,y=c.y,wasActive=activeChar()===c,before=rhTeam();
+ rhDeaths.add(c);c.hp=0;c.dead=true;c.v063RemovalPending=false;c.knockVx=c.knockVy=0;c.dashMove=null;
+ ldDown.add(c);ldPos.set(c,{x,y});
+ showMsg(c.name+' 전투불능',1200);
+ if(rhLive()){rhMember(c);rhEvent('downed',[rhId(c)].filter(Boolean),{form:c.form},before)}
+ if(party.every(p=>p.dead||p.hp<=0)){ldAllDown();return}
+ if(wasActive){
+  const n=party.length;
+  for(let k=1;k<=n;k++){const i=(active+k)%n,p=party[i];if(!p.dead&&p.hp>0){active=i;p.x=x;p.y=y;p.dashMove=null;p.tagInv=Math.max(p.tagInv||0,.6);effects.push({type:'tagWarp',x,y,r:52,t:.22,color:'#8fe8ff'});break}}
+ }
+}
+function ldRevive(c){
+ ldDown.delete(c);rhDeaths.delete(c);ldPos.delete(c);
+ c.dead=false;c.v063RemovalPending=false;c.tagInv=Math.max(c.tagInv||0,1);
+ const before=rhTeam();
+ v181Save(c);effects.push({type:'burst',x:c.x,y:c.y,r:90,t:.35,color:'#5cff8b'});
+ showMsg(c.name+' 전투 복귀',1200);
+ if(rhLive()){rhMember(c);rhEvent('revive',[rhId(c)].filter(Boolean),{form:c.form},before)}
+}
+function ldLethal(c){
+ if(!c||!party.includes(c)||ldDown.has(c))return false;
+ const t=ldTarget(c);
+ if(t)ldDevolve(c,t);else ldDownMember(c);
+ return true
+}
+const LD_rescue=r173Rescue;
+r173Rescue=function(c,dealt){
+ if(LD_rescue(c,dealt))return true;
+ if(!c||c.dead||!(dealt>0)||c.v011OriginalHp!=null||state!=='playing'||!party.includes(c))return false;
+ if(c.form==='megidramon'&&c.v10HazardT>0)return false;
+ if(c.hp-dealt>0)return false;
+ return ldLethal(c)
+};
+const LD_fallen=v063RemoveFallen;
+v063RemoveFallen=function(c,...args){
+ if(c&&party.includes(c)){if(ldDown.has(c))return;if(c.dead){ldLethal(c);return}}
+ return LD_fallen(c,...args)
+};
+const LD_update=update;
+update=function(dt){
+ const r=LD_update(dt);
+ if(state==='playing'){
+  for(const c of [...party]){
+   if(ldDown.has(c)){
+    const p=ldPos.get(c);if(p){c.x=p.x;c.y=p.y}
+    if(c.hp>0&&c.hp>=c.maxHp*.5)ldRevive(c);
+   }else if(c.dead||(Number.isFinite(c.hp)&&c.hp<=0)){
+    if(!c.dead){c.hp=0;c.dead=true}
+    ldLethal(c)
+   }
+  }
+ }
+ return r
+};
+const LD_draw=drawChar;
+drawChar=function(c,isActive){
+ if(!ldDown.has(c))return LD_draw(c,isActive);
+ const d=c.dead;c.dead=false;ctx.save();
+ try{ctx.filter='grayscale(1) brightness(.8)';LD_draw(c,false)}finally{ctx.restore();c.dead=d}
+};
+
+
+// ===== v0.18.7: reward-screen "back" safety, one miracle at a time =====
+// The back button is bound to the reward screen that opened the target screen. If that screen has already
+// finished (or another reward screen replaced it) the click is refused instead of re-offering a finished reward.
+function rwBackGuard(target){
+ return ()=>{
+  if(typeof target!=='function'||v080RewardBackRender!==target){drNote('stale',{reason:'back-blocked',title:($('#modalTitle')?.textContent||'').slice(0,24)});showMsg('이미 끝난 보상 화면입니다',1000);return}
+  target()
+ }
+}
+// A finished modal also finishes its reward screen.
+const RW_close=closeModal;
+closeModal=function(...args){v080RewardBackRender=null;return RW_close(...args)};
+// Never draw a second modal over one that is still open; the queued one opens when this one closes.
+const RW_open=openNextModal;
+openNextModal=function(...args){
+ if(modalQueue.length&&!ultimateState&&$('#modal').classList.contains('show')){drNote('overlap',{q:modalQueue.map(x=>x?.type||'?').join(','),title:($('#modalTitle')?.textContent||'').slice(0,24)});return}
+ return RW_open(...args)
+};
+// Miracle: while one is held (unused) no source may offer another; a stale offer is swapped for another relic.
+const RW_pool=v107RelicPool;
+v107RelicPool=function(){return RW_pool().filter(id=>id!=='miracle'||!v107Miracle)};
+const RW_offer=v107OfferRelic;
+v107OfferRelic=function(r,...args){
+ if(r?.id==='miracle'&&v107Miracle){const n=v107RollRelic();showMsg('이미 기적이 있어 다른 유물로 바뀌었습니다',1400);return RW_offer(n,...args)}
+ return RW_offer(r,...args)
+};
+
 // Local persistence is deliberately opt-in and separate from memory upgrades.
 function rhRead(){const raw=localStorage.getItem(RH_KEY);if(!raw)return {schema:1,runs:[]};const d=JSON.parse(raw);if(d.schema!==1||!Array.isArray(d.runs)||d.runs.some(r=>!r||typeof r.uid!=='string'||!Array.isArray(r.events)||!r.members))throw Error('저장된 런 기록을 읽을 수 없습니다. 기존 데이터는 변경하지 않았습니다.');return d}
 function rhSave(record){const d=rhRead();if(!d.runs.some(r=>r.uid===record.uid)){const copy=JSON.parse(JSON.stringify(record));if(copy.trace&&copy.trace.length>150)copy.trace=copy.trace.slice(-150);d.runs.push(copy)}localStorage.setItem(RH_KEY,JSON.stringify(d));return true}
@@ -22769,6 +22962,7 @@ function rhDetail(record){
  for(const m of Object.values(record.members)){
   const b=m.build||{},d=rhEl('details'),s=rhEl('summary','#'+m.id+' '+(b.name||b.form)+' · '+(RH_STATUS[m.status]||m.status));d.append(s);
   d.append(rhEl('p','진화 경로: '+(b.history||[]).map(f=>charDefs[f]?.name||f).join(' → ')));
+  if((b.route||[]).length)d.append(rhEl('p','계통 경로: '+b.route.map(f=>charDefs[f]?.name||f).join(' → ')+' ('+(RT_KINDS[b.routeKind]||'실제 진화')+') · 최고 도달: '+(b.peak||[]).map(f=>charDefs[f]?.name||f).join(' → ')));
   d.append(rhEl('p','공격력 '+Math.round(b.atk||0)+' · 최대 체력 '+Math.round(b.maxHp||0)+' · 방어력 '+Math.round(b.def||0)+' · EVO '+Math.round(b.ep||0)));
   const elems=Object.entries(b.elements||{}).filter(([,n])=>n>0).map(([k,n])=>(V014_ELEMENT_NAMES[k]||k)+' '+n).join(' / ');
   d.append(rhEl('p','속성 투자: '+(elems||'없음')));
@@ -22830,7 +23024,7 @@ if(new URLSearchParams(location.search).get('drtest')==='1'){
   guard:()=>v181Guard(),capture:()=>v181Capture(),signature:v=>v181Signature(v),
   mark:c=>drMarkEvolve(c),
   cmd:(type,targets,fn)=>drCommand(type,targets,fn),poll:()=>drPoll(),
-  ds:{busy:n=>{v181Busy=n},flag:()=>dsFlag({kind:'guard'}),get ring(){return dsRing},get hold(){return dsHold},get pending(){return dsPending},cands:()=>dsCandidates(),restore:(x,r)=>dsRestore(x,r),rollback:()=>dsRollback(),poll:()=>dsPoll(),tick:dt=>dsTick(dt),sample:c=>dsSample(c),drop:c=>{party=party.filter(p=>p!==c);rhExpected=rhExpected.filter(p=>p!==c);v181Expected=v181Expected.filter(p=>p!==c)},get undo(){return dsUndo}},
+  evo:{cost:(c,id)=>v10EvoCost(c,id),need:c=>v5EvoNeed(c),grant:(c,n,s)=>grantEvo(c,n,s),gain:(c,n,s)=>evoGainOf(c,n,s),skip:(c,id)=>evoStageCost(c,id)},rt:{evo:id=>(V5_EVO[id]||[]).map(x=>x[0]),stage:id=>V014_STAGE[id],path:c=>rtPath(c),all:f=>rtAll(f),pick:f=>rtPick(f),can:c=>rtCanDevolve(c)},ds:{busy:n=>{v181Busy=n},flag:()=>dsFlag({kind:'guard'}),get ring(){return dsRing},get hold(){return dsHold},get pending(){return dsPending},cands:()=>dsCandidates(),restore:(x,r)=>dsRestore(x,r),rollback:()=>dsRollback(),poll:()=>dsPoll(),tick:dt=>dsTick(dt),sample:c=>dsSample(c),drop:c=>{party=party.filter(p=>p!==c);rhExpected=rhExpected.filter(p=>p!==c);v181Expected=v181Expected.filter(p=>p!==c)},get undo(){return dsUndo}},
   setBack:f=>{v080RewardBackRender=f},get store(){return rhStore},saveNow:()=>rhSaveNow(),
   setState:v=>{state=v},setPaused:v=>{paused=v}
  };
