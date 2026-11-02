@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const DR_VERSION='0.18.1',DR_BUILD_LABEL='1단계 토대',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
+const DR_VERSION='0.18.2',DR_BUILD_LABEL='2단계 명령 점검',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
 if(!window.DR_SPRITE_DATA){const n=document.getElementById('gameErrorNotice');if(n){n.hidden=false;n.textContent='sprite_data.js 파일을 불러오지 못했습니다. patch.js와 같은 폴더에 함께 올렸는지 확인한 뒤 새로고침해 주세요.'}throw new Error('sprite_data.js missing')}
 const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rnd=(a,b)=>a+Math.random()*(b-a), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const menu=$('#menu'),sel=$('#select'),game=$('#game'),canvas=$('#c'),ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
@@ -22194,6 +22194,7 @@ function v181Restore(c,d,keys){for(const k of keys){if(Object.hasOwn(d,k))c[k]=v
 function v181Log(reason,fields=[]){const row={time:Math.round(v06Run?.time||0),reason,fields:fields.slice(0,30),forms:party.map(c=>c?.form||'?')};v181Diagnostics.push(row);if(v181Diagnostics.length>32)v181Diagnostics.shift();console.warn('[Party guard]',row)}
 // Public, read-only copy for bug reports. No server, identifiers, or persistent log.
 window.digimonPartyDiagnostics=()=>v181Copy(v181Diagnostics);
+window.digimonCommandLog=()=>v181Copy(drLog);
 function v181Stage(form){return hf172Stage(form)||0}
 function v181Save(c){
  const slot=v181Slots.find(s=>s.key===v181Key(c));if(!slot)return;
@@ -22301,7 +22302,7 @@ document.title='디지몬 RE:서바이버 v.0.18.0f';$('#buildBadge').textConten
 // v0.18.0g: run-scoped identities, explicit roster commands and opt-in history.
 const RH_KEY='digimon-resurvivor-runs-v1';
 let rhRun=null,rhSeq=0,rhIds=new WeakMap(),rhExpected=[],rhDeaths=new WeakSet(),rhEquipment=new WeakMap(),rhHp=new WeakMap(),rhDepth=0,rhStarting=false,rhPractice=false,rhSelected=null;
-const RH_NAMES={start:'출격',recruit:'영입',replace:'교체',sell:'판매',evolve:'진화',death:'사망',remove:'사망 이탈',fusion:'조그레스',miracle:'기적 부활',skip:'알 넘기기',blocked:'비정상 변경 차단',end:'회차 종료'};
+const RH_NAMES={start:'출격',recruit:'영입',replace:'교체',sell:'판매',evolve:'진화',death:'사망',remove:'사망 이탈',fusion:'조그레스',miracle:'기적 부활',skip:'알 넘기기',blocked:'비정상 변경 차단',audit:'변경 감사',end:'회차 종료'};
 function rhId(c){return c&&rhIds.get(c)}
 function rhLive(){return !!rhRun&&!rhRun.endedAt&&!rhStarting&&!rhPractice}
 function rhForm(c){return {id:rhId(c),form:c.form,name:charDefs[c.form]?.name||c.name}}
@@ -22312,7 +22313,7 @@ function rhEnroll(c,status='active'){
  if(rhId(c))return rhId(c);const id=++rhSeq;rhIds.set(c,id);
  Object.defineProperty(c,'runMemberId',{value:id,writable:false,enumerable:false,configurable:true});
  rhRun.members[id]={id,joinedAt:Math.round(v06Run.time||0),status,build:rhBuild(c),slotKey:v181Key(c)};
- rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhHp.set(c,Math.max(1,c.hp));return id
+ rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhHp.set(c,Math.max(1,c.hp));drWatchMember(c);return id
 }
 function rhEvent(type,ids=[],detail={},before=null){if(!rhLive())return;rhRun.events.push({seq:rhRun.events.length+1,time:Math.round(v06Run.time||0),type,ids:[...ids],detail:v181Copy(detail),before:before||rhTeam(),after:rhTeam()})}
 function rhAuthorizeDeath(c){
@@ -22335,8 +22336,80 @@ function rhGuard(){
  if(badRoster){const before=rhTeam();party=rhExpected.filter(c=>!rhDeaths.has(c)||party.includes(c));v177KeepActive(leader);rhEvent('blocked',party.map(rhId),{reason:'삭제·교체 명령 없는 파티 변경'},before)}
  rhExpected=rhExpected.filter(c=>!rhDeaths.has(c)||party.includes(c));
 }
+// v0.18.2: command audit. Every roster/state command runs through drCommand, declares the
+// individuals it may change, and is recorded. Undeclared changes are logged (audit) with the
+// recent event context; enforcement stays with v181Protect for recruitment.
+const DR_LOG_MAX=80;
+let drSeq=0,drCmdDepth=0;const drLog=[],drLastEvolve=new WeakMap(),drLastPts=new WeakMap(),drTripAt=new Map();
+function drNote(kind,detail={}){const row={n:++drSeq,t:Math.round(v06Run?.time||0),kind,...detail};drLog.push(row);if(drLog.length>DR_LOG_MAX)drLog.shift();return row}
+function drRecent(n=12){return drLog.slice(-n).map(r=>({...r}))}
+function drDiag(reason,fields,extra={}){const row={time:Math.round(v06Run?.time||0),reason,fields:fields.slice(0,30),forms:party.map(c=>c?.form||'?'),ctx:drRecent(10),...extra};v181Diagnostics.push(row);if(v181Diagnostics.length>32)v181Diagnostics.shift();console.warn('[Party audit]',reason,fields);return row}
+function drPoints(o){let n=0;if(o&&typeof o==='object')for(const v of Object.values(o)){if(typeof v==='number'&&v>0)n+=v;else if(v&&typeof v==='object')for(const w of Object.values(v))if(typeof w==='number'&&w>0)n+=w}return n}
+function drMarkEvolve(c){if(c&&typeof c==='object')drLastEvolve.set(c,performance.now())}
+function drEvolveNear(c,t){const at=drLastEvolve.get(c);return at!==undefined&&Math.abs(at-t)<150}
+function drTrip(c,field,from,to,stack){
+ const key=(rhId(c)||0)+':'+field,now=performance.now();if(now-(drTripAt.get(key)||-1e9)<1000)return;drTripAt.set(key,now);
+ drNote('trip',{id:rhId(c)||0,form:c.form,field,from:Math.round(from*100)/100,to:Math.round(to*100)/100});
+ drDiag('tripwire:'+field,[field],{id:rhId(c)||0,from,to,stack});
+ rhEvent('audit',[rhId(c)].filter(Boolean),{reason:'성장 수치 감소 감지 ('+field+')',from,to,stack:stack?String(stack).slice(0,400):undefined})
+}
+// EP: accessor reports a drop that is not tied to an evolution/devolution/fusion within 150 ms.
+function drWatchMember(c){
+ if(!c||typeof c!=='object'||c.__drWatch||!Object.hasOwn(c,'ep'))return;
+ Object.defineProperty(c,'__drWatch',{value:true,enumerable:false,configurable:true});
+ let ep=c.ep;
+ Object.defineProperty(c,'ep',{enumerable:true,configurable:true,get(){return ep},set(v){
+  if(typeof v==='number'&&typeof ep==='number'&&v<ep-.01){
+   const from=ep,at=performance.now(),stack=(new Error().stack||'').split('\n').slice(2,8).map(x=>x.trim().replace(/^at\s+/,'').replace(/https?:\/\/[^/\s]+\//g,'')).join(' | ');
+   setTimeout(()=>{if(party.includes(c)&&!v102Demo?.active&&!drEvolveNear(c,at))drTrip(c,'ep',from,c.ep,stack)},80)
+  }
+  ep=v}})
+}
+// Growth points (investments, element points, specialization counts): per-frame comparison.
+function drPoll(){
+ if(v102Demo?.active||state!=='playing')return;
+ const now=performance.now();
+ for(const c of party){
+  const pts=drPoints(c.invest)+drPoints(c.v109ElementPoints)+drPoints(c.v091?.counts),prev=drLastPts.get(c);
+  if(prev!==undefined&&pts<prev-.01&&!drEvolveNear(c,now))drTrip(c,'points',prev,pts);
+  drLastPts.set(c,pts)
+ }
+}
+// Modal context for the audit log (what screen was open when something changed).
+{
+ const modalEl=document.getElementById('modal'),titleEl=document.getElementById('modalTitle');
+ if(modalEl&&titleEl){
+  let open=modalEl.classList.contains('show');
+  new MutationObserver(()=>{const now=modalEl.classList.contains('show');if(now!==open){open=now;drNote(now?'modal-open':'modal-close',{title:(titleEl.textContent||'').slice(0,30)})}}).observe(modalEl,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(()=>{if(modalEl.classList.contains('show'))drNote('modal-page',{title:(titleEl.textContent||'').slice(0,30)})}).observe(titleEl,{childList:true,characterData:true,subtree:true});
+ }
+}
+function drCommand(type,targets,fn,detail={},onlyIfTruthy=false){
+ if(drCmdDepth>0)return fn();
+ const demo=!!v102Demo?.active;
+ const watch=demo?[]:party.filter(c=>!targets.includes(c)).map(c=>({c,snap:v181Snapshot(c,V181_GROWTH)}));
+ const note={n:0,t:Math.round(v06Run?.time||0),kind:'cmd',type,ids:targets.map(rhId).filter(Boolean),...detail};
+ const keep=()=>{note.n=++drSeq;drLog.push(note);if(drLog.length>DR_LOG_MAX)drLog.shift()};
+ if(!onlyIfTruthy)keep();
+ let result;
+ drCmdDepth++;
+ try{return result=fn()}
+ catch(e){note.error=String(e&&e.message||e).slice(0,80);if(onlyIfTruthy)keep();throw e}
+ finally{
+  drCmdDepth--;if(onlyIfTruthy&&result)keep();
+  for(const w of watch){
+   if(!party.includes(w.c))continue;
+   const fields=V181_GROWTH.filter(k=>v181Signature(w.snap[k])!==v181Signature(w.c[k]));
+   if(fields.length){
+    drNote('audit',{type,id:rhId(w.c)||0,form:w.c.form,fields:fields.slice(0,12)});
+    drDiag('audit:'+type,fields,{id:rhId(w.c)||0});
+    rhEvent('audit',[rhId(w.c)].filter(Boolean),{reason:'선언되지 않은 대상 변경 ('+type+')',fields:fields.slice(0,12)})
+   }
+  }
+ }
+}
 const RH_log=v181Log;
-v181Log=function(reason,fields=[]){const r=RH_log(reason,fields);rhEvent('blocked',party.map(rhId).filter(Boolean),{reason,fields});return r};
+v181Log=function(reason,fields=[]){const r=RH_log(reason,fields);const last=v181Diagnostics[v181Diagnostics.length-1];if(last&&!last.ctx)last.ctx=drRecent(10);drNote('guard',{reason,fields:fields.slice(0,8)});rhEvent('blocked',party.map(rhId).filter(Boolean),{reason,fields});return r};
 const RH_guard=v181Guard;
 v181Guard=function(){rhGuard();return RH_guard()};
 const RH_capture=v181Capture;
@@ -22345,7 +22418,7 @@ const RH_recruit=v181Recruit;
 v181Recruit=function(old,create){
  v181Guard();const before=rhTeam(),refs=party.slice(),oldId=rhId(old),oldForm=old?.form;
  if(old)rhMember(old);rhDepth++;let ok;
- try{ok=RH_recruit(old,create)}finally{rhDepth--}
+ try{ok=drCommand(old?'replace':'recruit',old?[old]:[],()=>RH_recruit(old,create),{form:old?.form})}finally{rhDepth--}
  if(ok&&rhLive()){
   const added=party.find(c=>!refs.includes(c));const id=rhEnroll(added);
   if(oldId)rhRun.members[oldId].status='replaced';
@@ -22354,24 +22427,26 @@ v181Recruit=function(old,create){
 };
 function rhSkipEgg(id,finish){v181Guard();const before=rhTeam();const r=v181Protect('egg-skip',finish);rhEvent('skip',[],{form:id},before);return r}
 const RH_sell=v014SellDigimon;
-v014SellDigimon=function(c,...args){v181Guard();const before=rhTeam(),id=rhId(c);rhMember(c);const soldBuild=rhRun&&id?v181Copy(rhRun.members[id].build):null;rhDepth++;let r;try{r=RH_sell(c,...args)}finally{rhDepth--}if(rhLive()&&id&&!party.includes(c)){rhRun.members[id].status='sold';rhRun.members[id].build=soldBuild;rhExpected=party.slice();rhEvent('sell',[id],{command:'sell-member'},before)}return r};
+v014SellDigimon=function(c,...args){v181Guard();if(!party.includes(c)){drNote('reject',{type:'sell',reason:'not-in-party',form:c?.form});return}const before=rhTeam(),id=rhId(c);rhMember(c);const soldBuild=rhRun&&id?v181Copy(rhRun.members[id].build):null;rhDepth++;let r;try{r=drCommand('sell',[c],()=>RH_sell(c,...args),{form:c.form})}finally{rhDepth--}if(rhLive()&&id&&!party.includes(c)){rhRun.members[id].status='sold';rhRun.members[id].build=soldBuild;rhExpected=party.slice();rhEvent('sell',[id],{command:'sell-member'},before)}return r};
 const RH_evolve=evolve;
-evolve=function(c,...args){const prior=c?.form,before=rhTeam();const r=RH_evolve(c,...args);if(rhLive()&&rhId(c)&&prior!==c.form){rhMember(c);rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('evolve',[rhId(c)],{from:prior,to:c.form},before)}return r};
+evolve=function(c,...args){const prior=c?.form,before=rhTeam();drMarkEvolve(c);const r=party.includes(c)?drCommand('evolve',[c],()=>RH_evolve(c,...args),{from:prior,to:typeof args[0]==='string'?args[0]:undefined}):RH_evolve(c,...args);drMarkEvolve(c);if(rhLive()&&rhId(c)&&prior!==c.form){rhMember(c);rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('evolve',[rhId(c)],{from:prior,to:c.form},before)}return r};
 const RH_fuse=v15Fuse;
-v15Fuse=function(c,p,...args){v181Guard();const before=rhTeam(),ids=[rhId(c),rhId(p)];rhMember(p);rhDepth++;let r;try{r=RH_fuse(c,p,...args)}finally{rhDepth--}if(rhLive()&&ids.every(Boolean)&&!party.includes(p)){rhRun.members[ids[1]].status='fused';rhMember(c);rhExpected=party.slice();rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('fusion',ids,{command:'consume-partner',to:c.form},before)}return r};
+v15Fuse=function(c,p,...args){v181Guard();if(!party.includes(c)||!party.includes(p)||c===p){drNote('reject',{type:'fusion',reason:'not-in-party'});return}const before=rhTeam(),ids=[rhId(c),rhId(p)];rhMember(p);drMarkEvolve(c);drMarkEvolve(p);rhDepth++;let r;try{r=drCommand('fusion',[c,p],()=>RH_fuse(c,p,...args),{to:args[0]})}finally{rhDepth--}drMarkEvolve(c);if(rhLive()&&ids.every(Boolean)&&!party.includes(p)){rhRun.members[ids[1]].status='fused';rhMember(c);rhExpected=party.slice();rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('fusion',ids,{command:'consume-partner',to:c.form},before)}return r};
+const DR_devolve=v15Devolve;
+v15Devolve=function(...args){for(const m of party)drMarkEvolve(m);const r=drCommand('devolve',[...party],()=>DR_devolve(...args),{index:args[1],to:typeof args[2]==='string'?args[2]:undefined});for(const m of party)drMarkEvolve(m);return r};
 const RH_fallen=v063RemoveFallen;
 v063RemoveFallen=function(c,...args){
  if(rhLive()&&rhId(c)&&!rhDeaths.has(c)){rhGuard();rhEvent('blocked',[rhId(c)],{reason:'사망 명령 없는 이탈 요청'});return}
- const before=rhTeam(),present=party.includes(c);const r=RH_fallen(c,...args);
+ const before=rhTeam(),present=party.includes(c);const r=drCommand('remove',[c],()=>RH_fallen(c,...args),{form:c?.form});
  if(rhLive()&&present&&!party.includes(c)){rhMember(c,'dead');rhExpected=rhExpected.filter(p=>p!==c);rhEvent('remove',[rhId(c)],{command:'confirmed-death'},before)}return r
 };
 const RH_equip=v107Equip,RH_remove=v107RemoveRelic;
-v107Equip=function(c,...args){if(!rhDepth)rhGuard();rhDepth++;let r;try{r=RH_equip(c,...args)}finally{rhDepth--}if(rhId(c)){rhEquipment.set(c,v181Copy(c.v107Relics||[]));if(party.includes(c))rhMember(c)}return r};
-v107RemoveRelic=function(c,...args){if(!rhDepth)rhGuard();rhDepth++;let r;try{r=RH_remove(c,...args)}finally{rhDepth--}if(rhId(c)){rhEquipment.set(c,v181Copy(c.v107Relics||[]));if(party.includes(c))rhMember(c)}return r};
+v107Equip=function(c,...args){if(!rhDepth)rhGuard();rhDepth++;let r;try{r=drCommand('equip',[c],()=>RH_equip(c,...args),{form:c?.form})}finally{rhDepth--}if(rhId(c)){rhEquipment.set(c,v181Copy(c.v107Relics||[]));if(party.includes(c))rhMember(c)}return r};
+v107RemoveRelic=function(c,...args){if(!rhDepth)rhGuard();rhDepth++;let r;try{r=drCommand('unequip',[c],()=>RH_remove(c,...args),{form:c?.form})}finally{rhDepth--}if(rhId(c)){rhEquipment.set(c,v181Copy(c.v107Relics||[]));if(party.includes(c))rhMember(c)}return r};
 const RH_revive=v181Revive;
 v181Revive=function(){
  const before=rhTeam(),sources=v181Slots.filter(s=>s.data).map(s=>Object.values(rhRun?.members||{}).find(m=>m.slotKey===s.key)?.id||null);
- rhDepth++;let ok;try{ok=RH_revive()}finally{rhDepth--}
+ rhDepth++;let ok;try{ok=drCommand('miracle',[...party],()=>RH_revive(),{},true)}finally{rhDepth--}
  if(ok&&rhLive()){
   const links=party.map((c,i)=>{const id=rhEnroll(c);if(sources[i]){rhRun.members[sources[i]].status='revived-as-new';rhRun.members[id].from=sources[i]}return{from:sources[i],to:id,form:c.form}});
   rhExpected=party.slice();for(const c of party)rhRun.members[rhId(c)].slotKey=v181Key(c);
@@ -22400,7 +22475,7 @@ reStartDialogue=function(speaker,lines,onDone,...rest){
  return RH_dialogue(speaker,lines,onDone,...rest)
 };
 const RH_update=update;
-update=function(dt){const r=RH_update(dt);if(rhLive()){for(const c of rhExpected)if(!c.dead&&c.hp>0)rhHp.set(c,c.hp);if(state==='cleared'&&rhFreeze('ending'))rhAsk(rhRun)}return r};
+update=function(dt){if(rhLive())drPoll();const r=RH_update(dt);if(rhLive()){for(const c of rhExpected)if(!c.dead&&c.hp>0)rhHp.set(c,c.hp);if(state==='cleared'&&rhFreeze('ending'))rhAsk(rhRun)}return r};
 // Local persistence is deliberately opt-in and separate from memory upgrades.
 function rhRead(){const raw=localStorage.getItem(RH_KEY);if(!raw)return {schema:1,runs:[]};const d=JSON.parse(raw);if(d.schema!==1||!Array.isArray(d.runs)||d.runs.some(r=>!r||typeof r.uid!=='string'||!Array.isArray(r.events)||!r.members))throw Error('저장된 런 기록을 읽을 수 없습니다. 기존 데이터는 변경하지 않았습니다.');return d}
 function rhSave(record){const d=rhRead();if(!d.runs.some(r=>r.uid===record.uid))d.runs.push(JSON.parse(JSON.stringify(record)));localStorage.setItem(RH_KEY,JSON.stringify(d));return true}
@@ -22437,7 +22512,7 @@ function rhEventText(e,record){
  if(e.type==='miracle')return (d.links||[]).map(l=>'#'+l.from+' → 새 개체 #'+l.to+' '+form(l.form)).join(' / ');
  if(e.type==='replace')return '#'+e.ids[0]+' '+form(d.oldForm)+' 교체 → #'+e.ids[1]+' '+form(d.newForm);
  if(e.type==='skip')return form(d.form)+' 디지에그 넘기기';
- if(e.type==='blocked')return names+' · '+d.reason;
+ if(e.type==='blocked'||e.type==='audit')return names+' · '+d.reason;
  return (RH_NAMES[e.type]||e.type)+(names?' · '+names:'')
 }
 function rhDetail(record){
@@ -22469,6 +22544,26 @@ function rhList(){
 }
 const rhMenuBtn=rhButton('나의 런 기록',rhList);rhMenuBtn.id='runHistoryBtn';$('#startBtn').insertAdjacentElement('afterend',rhMenuBtn);
 document.title=DR_TITLE;$('#buildBadge').textContent=DR_BADGE;
+
+// Regression-test hook. Inert unless the page is opened with ?drtest=1.
+if(new URLSearchParams(location.search).get('drtest')==='1'){
+ window.__dr={
+  get party(){return party},get active(){return active},get state(){return state},get run(){return rhRun},
+  get log(){return drLog},get diag(){return v181Diagnostics},get slots(){return v181Slots},
+  mkChar:form=>mkChar(form),has:form=>!!charDefs[form],id:c=>rhId(c),
+  sig:c=>v181Signature(v181Snapshot(c,V181_GROWTH)),snap:c=>v181Snapshot(c,V181_GROWTH),
+  fields:()=>V181_GROWTH.slice(),
+  newMember(form,x,y){ensureStarterLoadout(baseStarterFor({form}));const c=v070InitPartnerProgress(mkChar(form));c.x=x??WORLD.w/2;c.y=y??WORLD.h/2;c.ult=30;return c},
+  recruit(old,make){return v181Recruit(old||null,make)},
+  sell:c=>v014SellDigimon(c),fuse:(c,p,id)=>v15Fuse(c,p,id),fusionOptions:c=>v15FusionOptions(c),
+  evolve:(c,id)=>evolve(c,id),devolve:(...a)=>v15Devolve(...a),
+  hit:(c,n)=>playerHit(c,n),grantMiracle:()=>{v107Miracle=1},get miracle(){return v107Miracle},
+  guard:()=>v181Guard(),capture:()=>v181Capture(),signature:v=>v181Signature(v),
+  mark:c=>drMarkEvolve(c),
+  cmd:(type,targets,fn)=>drCommand(type,targets,fn),poll:()=>drPoll(),
+  setState:v=>{state=v},setPaused:v=>{paused=v}
+ };
+}
 
 V107_RELICS.miracle.desc='전멸 시 최근 파티 최대 3명의 최고 진화체·유물·투자 빌드를 가진 새 개체로 1회 부활 · 새 식별번호 · 체력 50%';
 
