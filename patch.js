@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const DR_VERSION='0.18.2',DR_BUILD_LABEL='2단계 명령 점검',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
+const DR_VERSION='0.18.3a',DR_BUILD_LABEL='복구 장치',DR_TITLE='디지몬 RE:서바이버 v.'+DR_VERSION,DR_BADGE='BUILD v.'+DR_VERSION+' · '+DR_BUILD_LABEL;
 if(!window.DR_SPRITE_DATA){const n=document.getElementById('gameErrorNotice');if(n){n.hidden=false;n.textContent='sprite_data.js 파일을 불러오지 못했습니다. patch.js와 같은 폴더에 함께 올렸는지 확인한 뒤 새로고침해 주세요.'}throw new Error('sprite_data.js missing')}
 const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rnd=(a,b)=>a+Math.random()*(b-a), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const menu=$('#menu'),sel=$('#select'),game=$('#game'),canvas=$('#c'),ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
@@ -22302,7 +22302,7 @@ document.title='디지몬 RE:서바이버 v.0.18.0f';$('#buildBadge').textConten
 // v0.18.0g: run-scoped identities, explicit roster commands and opt-in history.
 const RH_KEY='digimon-resurvivor-runs-v1';
 let rhRun=null,rhSeq=0,rhIds=new WeakMap(),rhExpected=[],rhDeaths=new WeakSet(),rhEquipment=new WeakMap(),rhHp=new WeakMap(),rhDepth=0,rhStarting=false,rhPractice=false,rhSelected=null;
-const RH_NAMES={start:'출격',recruit:'영입',replace:'교체',sell:'판매',evolve:'진화',death:'사망',remove:'사망 이탈',fusion:'조그레스',miracle:'기적 부활',skip:'알 넘기기',blocked:'비정상 변경 차단',audit:'변경 감사',end:'회차 종료'};
+const RH_NAMES={start:'출격',recruit:'영입',replace:'교체',sell:'판매',evolve:'진화',death:'사망',remove:'사망 이탈',fusion:'조그레스',miracle:'기적 부활',skip:'알 넘기기',blocked:'비정상 변경 차단',audit:'변경 감사',devolve:'퇴화',end:'회차 종료'};
 function rhId(c){return c&&rhIds.get(c)}
 function rhLive(){return !!rhRun&&!rhRun.endedAt&&!rhStarting&&!rhPractice}
 function rhForm(c){return {id:rhId(c),form:c.form,name:charDefs[c.form]?.name||c.name}}
@@ -22315,7 +22315,12 @@ function rhEnroll(c,status='active'){
  rhRun.members[id]={id,joinedAt:Math.round(v06Run.time||0),status,build:rhBuild(c),slotKey:v181Key(c)};
  rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhHp.set(c,Math.max(1,c.hp));drWatchMember(c);return id
 }
-function rhEvent(type,ids=[],detail={},before=null){if(!rhLive())return;rhRun.events.push({seq:rhRun.events.length+1,time:Math.round(v06Run.time||0),type,ids:[...ids],detail:v181Copy(detail),before:before||rhTeam(),after:rhTeam()})}
+function rhEvent(type,ids=[],detail={},before=null){
+ if(!rhLive())return;
+ const open=document.getElementById('modal')?.classList.contains('show');
+ rhRun.events.push({seq:rhRun.events.length+1,time:Math.round(v06Run.time||0),type,ids:[...ids],detail:v181Copy(detail),screen:open?(document.getElementById('modalTitle')?.textContent||'').slice(0,24):'',q:modalQueue.map(x=>x?.type||'?'),before:before||rhTeam(),after:rhTeam()});
+ rhDirty=true;if(type==='blocked')dsFlag({kind:'guard'})
+}
 function rhAuthorizeDeath(c){
  if(!rhLive()||!rhId(c)||rhDeaths.has(c))return;
  rhDeaths.add(c);rhMember(c,'dead');rhEvent('death',[rhId(c)],{form:c.form,command:'lethal-damage'});
@@ -22340,8 +22345,10 @@ function rhGuard(){
 // individuals it may change, and is recorded. Undeclared changes are logged (audit) with the
 // recent event context; enforcement stays with v181Protect for recruitment.
 const DR_LOG_MAX=80;
-let drSeq=0,drCmdDepth=0;const drLog=[],drLastEvolve=new WeakMap(),drLastPts=new WeakMap(),drTripAt=new Map();
-function drNote(kind,detail={}){const row={n:++drSeq,t:Math.round(v06Run?.time||0),kind,...detail};drLog.push(row);if(drLog.length>DR_LOG_MAX)drLog.shift();return row}
+let drScreenFid=0,drFnSeq=0;const drFnIds=new WeakMap();
+function drFid(){const f=v080RewardBackRender;if(typeof f!=='function')return 0;if(!drFnIds.has(f))drFnIds.set(f,++drFnSeq);return drFnIds.get(f)}
+let drSeq=0,drCmdDepth=0,drInDevolve=0;const drLog=[],drLastEvolve=new WeakMap(),drLastPts=new WeakMap(),drTripAt=new Map();
+function drNote(kind,detail={}){const row={n:++drSeq,t:Math.round(v06Run?.time||0),kind,...detail};drLog.push(row);if(drLog.length>DR_LOG_MAX)drLog.shift();rhTrace(row);return row}
 function drRecent(n=12){return drLog.slice(-n).map(r=>({...r}))}
 function drDiag(reason,fields,extra={}){const row={time:Math.round(v06Run?.time||0),reason,fields:fields.slice(0,30),forms:party.map(c=>c?.form||'?'),ctx:drRecent(10),...extra};v181Diagnostics.push(row);if(v181Diagnostics.length>32)v181Diagnostics.shift();console.warn('[Party audit]',reason,fields);return row}
 function drPoints(o){let n=0;if(o&&typeof o==='object')for(const v of Object.values(o)){if(typeof v==='number'&&v>0)n+=v;else if(v&&typeof v==='object')for(const w of Object.values(v))if(typeof w==='number'&&w>0)n+=w}return n}
@@ -22380,8 +22387,18 @@ function drPoll(){
  const modalEl=document.getElementById('modal'),titleEl=document.getElementById('modalTitle');
  if(modalEl&&titleEl){
   let open=modalEl.classList.contains('show');
-  new MutationObserver(()=>{const now=modalEl.classList.contains('show');if(now!==open){open=now;drNote(now?'modal-open':'modal-close',{title:(titleEl.textContent||'').slice(0,30)})}}).observe(modalEl,{attributes:true,attributeFilter:['class']});
-  new MutationObserver(()=>{if(modalEl.classList.contains('show'))drNote('modal-page',{title:(titleEl.textContent||'').slice(0,30)})}).observe(titleEl,{childList:true,characterData:true,subtree:true});
+  const queueText=()=>modalQueue.map(x=>x?.type||'?').join(',');
+  const screenInfo=()=>({title:(titleEl.textContent||'').slice(0,30),q:queueText(),ids:party.map(rhId).filter(Boolean),fid:drFid()});
+  new MutationObserver(()=>{const now=modalEl.classList.contains('show');if(now!==open){open=now;const info=screenInfo();if(now)drScreenFid=info.fid;drNote(now?'modal-open':'modal-close',info)}}).observe(modalEl,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(()=>{if(modalEl.classList.contains('show')){const info=screenInfo();drScreenFid=info.fid;drNote('modal-page',info)}}).observe(titleEl,{childList:true,characterData:true,subtree:true});
+  // Every button press inside a modal is recorded before its own handler runs.
+  modalEl.addEventListener('click',ev=>{
+   const b=ev.target?.closest?.('button');if(!b)return;
+   const text=(b.textContent||'').replace(/\s+/g,' ').trim().slice(0,28),info=screenInfo();
+   drNote('click',{text,title:info.title,q:info.q,ids:info.ids,fid:info.fid,screenFid:drScreenFid});
+   // "다른 보상 선택" re-renders the offer stored in a global; if that global was replaced after this screen opened, it would re-run a different (finished) offer.
+   if(/다른 보상 선택/.test(text)&&info.fid!==drScreenFid)drNote('stale',{reason:'back-render-replaced',text,fid:info.fid,screenFid:drScreenFid,title:info.title,q:info.q})
+  },true);
  }
 }
 function drCommand(type,targets,fn,detail={},onlyIfTruthy=false){
@@ -22389,7 +22406,7 @@ function drCommand(type,targets,fn,detail={},onlyIfTruthy=false){
  const demo=!!v102Demo?.active;
  const watch=demo?[]:party.filter(c=>!targets.includes(c)).map(c=>({c,snap:v181Snapshot(c,V181_GROWTH)}));
  const note={n:0,t:Math.round(v06Run?.time||0),kind:'cmd',type,ids:targets.map(rhId).filter(Boolean),...detail};
- const keep=()=>{note.n=++drSeq;drLog.push(note);if(drLog.length>DR_LOG_MAX)drLog.shift()};
+ const keep=()=>{note.n=++drSeq;drLog.push(note);if(drLog.length>DR_LOG_MAX)drLog.shift();rhTrace(note)};
  if(!onlyIfTruthy)keep();
  let result;
  drCmdDepth++;
@@ -22429,11 +22446,11 @@ function rhSkipEgg(id,finish){v181Guard();const before=rhTeam();const r=v181Prot
 const RH_sell=v014SellDigimon;
 v014SellDigimon=function(c,...args){v181Guard();if(!party.includes(c)){drNote('reject',{type:'sell',reason:'not-in-party',form:c?.form});return}const before=rhTeam(),id=rhId(c);rhMember(c);const soldBuild=rhRun&&id?v181Copy(rhRun.members[id].build):null;rhDepth++;let r;try{r=drCommand('sell',[c],()=>RH_sell(c,...args),{form:c.form})}finally{rhDepth--}if(rhLive()&&id&&!party.includes(c)){rhRun.members[id].status='sold';rhRun.members[id].build=soldBuild;rhExpected=party.slice();rhEvent('sell',[id],{command:'sell-member'},before)}return r};
 const RH_evolve=evolve;
-evolve=function(c,...args){const prior=c?.form,before=rhTeam();drMarkEvolve(c);const r=party.includes(c)?drCommand('evolve',[c],()=>RH_evolve(c,...args),{from:prior,to:typeof args[0]==='string'?args[0]:undefined}):RH_evolve(c,...args);drMarkEvolve(c);if(rhLive()&&rhId(c)&&prior!==c.form){rhMember(c);rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('evolve',[rhId(c)],{from:prior,to:c.form},before)}return r};
+evolve=function(c,...args){const prior=c?.form,before=rhTeam();drMarkEvolve(c);const r=party.includes(c)?drCommand('evolve',[c],()=>RH_evolve(c,...args),{from:prior,to:typeof args[0]==='string'?args[0]:undefined}):RH_evolve(c,...args);drMarkEvolve(c);if(rhLive()&&rhId(c)&&prior!==c.form){rhMember(c);rhEquipment.set(c,v181Copy(c.v107Relics||[]));if(!drInDevolve)rhEvent('evolve',[rhId(c)],{from:prior,to:c.form},before)}return r};
 const RH_fuse=v15Fuse;
 v15Fuse=function(c,p,...args){v181Guard();if(!party.includes(c)||!party.includes(p)||c===p){drNote('reject',{type:'fusion',reason:'not-in-party'});return}const before=rhTeam(),ids=[rhId(c),rhId(p)];rhMember(p);drMarkEvolve(c);drMarkEvolve(p);rhDepth++;let r;try{r=drCommand('fusion',[c,p],()=>RH_fuse(c,p,...args),{to:args[0]})}finally{rhDepth--}drMarkEvolve(c);if(rhLive()&&ids.every(Boolean)&&!party.includes(p)){rhRun.members[ids[1]].status='fused';rhMember(c);rhExpected=party.slice();rhEquipment.set(c,v181Copy(c.v107Relics||[]));rhEvent('fusion',ids,{command:'consume-partner',to:c.form},before)}return r};
 const DR_devolve=v15Devolve;
-v15Devolve=function(...args){for(const m of party)drMarkEvolve(m);const r=drCommand('devolve',[...party],()=>DR_devolve(...args),{index:args[1],to:typeof args[2]==='string'?args[2]:undefined});for(const m of party)drMarkEvolve(m);return r};
+v15Devolve=function(...args){const before=rhTeam(),was=party.map(c=>({c,form:c.form,ep:c.ep}));for(const m of party)drMarkEvolve(m);drInDevolve++;let r;try{r=drCommand('devolve',[...party],()=>DR_devolve(...args),{index:args[1]})}finally{drInDevolve--}for(const m of party)drMarkEvolve(m);if(rhLive()){const moved=was.filter(w=>party.includes(w.c)&&(w.c.form!==w.form||Math.abs(w.c.ep-w.ep)>.001));if(moved.length){for(const w of moved)rhMember(w.c);rhEvent('devolve',moved.map(w=>rhId(w.c)).filter(Boolean),{changes:moved.map(w=>({id:rhId(w.c),from:w.form,to:w.c.form,ep:[Math.round(w.ep),Math.round(w.c.ep)]}))},before)}}return r};
 const RH_fallen=v063RemoveFallen;
 v063RemoveFallen=function(c,...args){
  if(rhLive()&&rhId(c)&&!rhDeaths.has(c)){rhGuard();rhEvent('blocked',[rhId(c)],{reason:'사망 명령 없는 이탈 요청'});return}
@@ -22457,8 +22474,8 @@ const RH_accept=v181Accept;
 v181Accept=function(...args){const r=RH_accept(...args);if(rhRun)for(const c of party)if(rhId(c))rhRun.members[rhId(c)].slotKey=v181Key(c);return r};
 function rhStart(){
  rhSeq=0;rhIds=new WeakMap();rhDeaths=new WeakSet();rhEquipment=new WeakMap();rhHp=new WeakMap();
- rhRun={schema:1,uid:crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(),version:DR_VERSION,startedAt:new Date().toISOString(),endedAt:null,events:[],members:{},initial:[],final:[],outcome:null,level:1,layer:1,duration:0};
- for(const c of party){rhEnroll(c);rhRun.members[rhId(c)].slotKey=v181Key(c)}rhExpected=party.slice();rhRun.initial=rhTeam();rhEvent('start',party.map(rhId));
+ rhRun={schema:1,uid:crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(),version:DR_VERSION,startedAt:new Date().toISOString(),endedAt:null,events:[],members:{},initial:[],final:[],outcome:null,level:1,layer:1,duration:0,trace:[],flags:{},flagged:false,env:{ua:navigator.userAgent.slice(0,200),vw:innerWidth,vh:innerHeight,dpr:devicePixelRatio,mobile:!!vMobileEnabled,lang:navigator.language}};
+ for(const c of party){rhEnroll(c);rhRun.members[rhId(c)].slotKey=v181Key(c)}rhExpected=party.slice();rhRun.initial=rhTeam();rhEvent('start',party.map(rhId));rhDirty=true;rhSaveNow()
 }
 const RH_init=initGame;
 initGame=function(...args){rhStarting=true;rhRun=null;rhExpected=[];rhPanel.hidden=true;let r;try{r=RH_init(...args)}finally{rhStarting=false}if(!rhPractice)rhStart();document.title=DR_TITLE;$('#buildBadge').textContent=DR_BADGE;return r};
@@ -22466,7 +22483,7 @@ const RH_trial=v102StartTrial;
 v102StartTrial=function(...args){rhPractice=true;try{return RH_trial(...args)}finally{rhPractice=false;rhRun=null;rhExpected=[]}};
 function rhFreeze(outcome){
  if(!rhLive())return false;for(const c of rhExpected)rhMember(c,rhDeaths.has(c)?'dead':'active');
- rhEvent('end',party.map(rhId),{outcome});rhRun.final=rhTeam();rhRun.outcome=outcome;rhRun.level=level;rhRun.layer=v06Run.layer||1;rhRun.duration=Math.round(v06Run.time||0);rhRun.endedAt=new Date().toISOString();return true
+ rhEvent('end',party.map(rhId),{outcome});rhRun.final=rhTeam();rhRun.outcome=outcome;rhRun.level=level;rhRun.layer=v06Run.layer||1;rhRun.duration=Math.round(v06Run.time||0);rhRun.endedAt=new Date().toISOString();rhSaveNow();return true
 }
 const RH_dialogue=reStartDialogue;
 reStartDialogue=function(speaker,lines,onDone,...rest){
@@ -22476,9 +22493,238 @@ reStartDialogue=function(speaker,lines,onDone,...rest){
 };
 const RH_update=update;
 update=function(dt){if(rhLive())drPoll();const r=RH_update(dt);if(rhLive()){for(const c of rhExpected)if(!c.dead&&c.hp>0)rhHp.set(c,c.hp);if(state==='cleared'&&rhFreeze('ending'))rhAsk(rhRun)}return r};
+
+// v0.18.3: run trace, anomaly flags and automatic local keeping (two slots: latest run, latest flagged run).
+const RH_LAST_KEY='digimon-resurvivor-lastrun-v1',RH_TRACE_MAX=600,RH_FLAG_NAMES={audit:'변경 감사',trip:'성장 수치 감소',guard:'보호 장치 개입',stale:'오래된 되돌아가기'};
+let rhDirty=false,rhSaveWarned=false,rhToastAt=-1e9,rhStore={last:null,flagged:null};
+try{const raw=localStorage.getItem(RH_LAST_KEY);if(raw){const d=JSON.parse(raw);rhStore={last:d.last||null,flagged:d.flagged||null}}}catch(e){}
+function rhTrace(row){
+ if(!rhLive())return;
+ const t=rhRun.trace;t.push(row);
+ if(t.length>RH_TRACE_MAX)t.splice(20,t.length-RH_TRACE_MAX);
+ rhDirty=true;
+ if(RH_FLAG_NAMES[row.kind]){
+  rhRun.flags[row.kind]=(rhRun.flags[row.kind]||0)+1;
+  if(!rhRun.flagged){rhRun.flagged=true;}
+  if(row.kind==='audit'||row.kind==='trip'||row.kind==='guard')dsFlag(row);
+  rhToastShow('이상 징후가 기록되었습니다 ('+RH_FLAG_NAMES[row.kind]+'). 시작 화면의 "마지막 런 기록"에서 파일로 받을 수 있습니다.');
+  rhSaveNow()
+ }
+}
+function rhLastCopy(record){const c=JSON.parse(JSON.stringify(record));if(c.trace&&c.trace.length>RH_TRACE_MAX)c.trace=c.trace.slice(-RH_TRACE_MAX);c.savedAt=new Date().toISOString();return c}
+function rhSaveNow(){
+ if(!rhRun||rhPractice)return;rhDirty=false;
+ try{
+  const c=rhLastCopy(rhRun);rhStore.last=c;if(rhRun.flagged)rhStore.flagged=c;
+  localStorage.setItem(RH_LAST_KEY,JSON.stringify(rhStore));rhLastLabel()
+ }catch(e){if(!rhSaveWarned){rhSaveWarned=true;console.warn('[Run record] autosave failed',e&&e.message)}}
+}
+setInterval(()=>{if(rhDirty&&rhLive())rhSaveNow()},3000);
+addEventListener('pagehide',()=>{if(rhDirty&&rhRun)rhSaveNow()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&rhDirty&&rhRun)rhSaveNow()});
+window.digimonRunTrace=()=>rhRun?v181Copy(rhRun.trace):[];
+const rhToast=document.createElement('div');rhToast.id='runRecordToast';rhToast.hidden=true;rhToast.setAttribute('role','status');
+rhToast.style.cssText='position:fixed;left:12px;top:84px;z-index:190;max-width:min(78vw,430px);padding:8px 12px;background:#3a2c12;color:#ffe9b3;border:2px solid #e6bd65;font:12px/1.5 system-ui,sans-serif;pointer-events:none';
+document.body.appendChild(rhToast);
+function rhToastShow(text){const now=performance.now();if(now-rhToastAt<20000)return;rhToastAt=now;rhToast.textContent='⚠ '+text;rhToast.hidden=false;setTimeout(()=>{rhToast.hidden=true},8000)}
+// v0.18.3a: recovery. Rolling per-individual snapshots; when an anomaly is flagged the affected
+// individuals are frozen at their last good snapshot and the player may restore what regressed.
+// Restoring is itself a declared command ('restore'), so the audit and guards treat it as legitimate.
+const DS_KEEP=15,DS_PROGRESS=['ep','invest','v109ElementPoints','v091','v014History','v014Attrs','v107Relics','memoryBuild','heritage','v10Picks','cardStacks','uniqueSet','mods','statusEnchant','elementMod','elementModLv','aff','v15InheritedHistory'];
+const DS_LABEL={form:'진화체',ep:'진화 EP',invest:'투자',v109ElementPoints:'속성 포인트',v091:'특화',v014History:'진화 이력',v014Attrs:'계통 속성',v107Relics:'유물',memoryBuild:'메모리',heritage:'계승',v10Picks:'선택 기록',cardStacks:'카드 중첩',uniqueSet:'고유 세트',mods:'개조',statusEnchant:'상태 부여',elementMod:'속성 개조',elementModLv:'속성 개조 레벨',aff:'친화도',v15InheritedHistory:'계승 이력',lost:'파티에서 사라짐'};
+let dsRing=new Map(),dsHold=new Map(),dsPending=false,dsEmpty=0,dsClock=0,dsUndo=null,dsPrevPaused=false;
+const dsName=f=>charDefs[f]?.name||f;
+function dsReset(){dsRing=new Map();dsHold=new Map();dsPending=false;dsEmpty=0;dsClock=0;dsUndo=null;dsBarHide();if(dsPanel.style.display!=='none')dsClose()}
+function dsGet(o,k){return k==='v091'?{counts:o?.v091?.counts,scores:o?.v091?.scores}:o?.[k]}
+// Merge "what the individual has now" with "what the snapshot had": never lower than either.
+function dsMax(cur,old){
+ if(old===undefined||old===null)return cur;
+ if(cur===undefined||cur===null)return v181Copy(old);
+ if(typeof old==='number')return typeof cur==='number'?Math.max(cur,old):old;
+ if(Array.isArray(old))return Array.isArray(cur)&&cur.length>=old.length?cur:v181Copy(old);
+ if(old instanceof Set||old instanceof Map)return cur&&cur.size>=old.size?cur:v181Copy(old);
+ if(typeof old==='object'){if(typeof cur!=='object')return v181Copy(old);const r=v181Copy(cur);for(const k of Object.keys(old)){if(k==='v011Owner')continue;r[k]=dsMax(cur[k],old[k])}return r}
+ return cur
+}
+function dsFields(c,snap){
+ const f=[],cs=v181Stage(c.form),ss=v181Stage(snap.form);
+ if(c.form!==snap.form&&cs<ss)f.push('form');
+ for(const k of DS_PROGRESS){
+  if(!Object.hasOwn(snap,k))continue;
+  if(k==='ep'&&cs>ss)continue;   // evolving legitimately spends EP
+  const cur=dsGet(c,k),old=dsGet(snap,k);
+  if(v181Signature(dsMax(cur,old))!==v181Signature(cur))f.push(k)
+ }
+ return f
+}
+function dsPick(L,at){if(at==null)return L[L.length-1];for(let i=L.length-1;i>=0;i--)if(L[i].at<=at)return L[i];return L[0]}
+function dsSample(c,force){
+ const id=rhId(c);if(!id||c.dead||dsHold.has(id))return;
+ const L=dsRing.get(id)||[];dsRing.set(id,L);
+ L.push({at:performance.now(),time:Math.round(v06Run?.time||0),snap:v181Snapshot(c,V181_PROTECTED)});
+ if(L.length>DS_KEEP)L.shift()
+}
+function dsTick(dt){
+ if(!rhLive()||state!=='playing'||paused||v102Demo?.active||drCmdDepth||v181Busy)return;
+ dsClock+=dt;const due=dsClock>=1;if(due)dsClock=0;
+ for(const c of party){const id=rhId(c);if(id&&(due||!(dsRing.get(id)||[]).length))dsSample(c)}
+}
+function dsFlag(row){
+ if(!rhLive())return;
+ const ids=row.id?[row.id]:party.map(rhId).filter(Boolean);
+ for(const id of ids)if(!dsHold.has(id))dsHold.set(id,performance.now()-400);
+ dsPending=true;dsEmpty=0
+}
+function dsCandidates(){
+ const out=[];if(!rhLive())return out;
+ const now=Math.round(v06Run?.time||0);
+ for(const [id,at] of dsHold){
+  const c=party.find(p=>rhId(p)===id),L=dsRing.get(id)||[];if(!c||!L.length)continue;
+  const e=dsPick(L,at),fields=e&&dsFields(c,e.snap);
+  if(fields&&fields.length)out.push({kind:'reset',id,c,e,fields,age:Math.max(0,now-e.time)})
+ }
+ if(dsPending)for(const m of Object.values(rhRun.members)){
+  if(m.status!=='active'||party.some(p=>rhId(p)===m.id))continue;
+  const L=dsRing.get(m.id)||[];if(L.length){const e=L[L.length-1];out.push({kind:'lost',id:m.id,c:null,e,fields:['lost'],age:Math.max(0,now-e.time)})}
+ }
+ return out
+}
+function dsDescribe(x){
+ const s=x.e.snap,c=x.c;
+ if(x.kind==='lost')return dsName(s.form)+' · 파티에서 사라짐 → '+dsName(s.form)+' 상태로 복구';
+ return x.fields.map(k=>k==='form'?'진화체: 현재 '+dsName(c.form)+' → 복구 '+dsName(s.form):k==='ep'?'진화 EP: 현재 '+Math.round(c.ep||0)+' → 복구 '+Math.round(Math.max(c.ep||0,s.ep||0)):(DS_LABEL[k]||k)).join(' · ')
+}
+function dsModalOpen(){return $('#modal').classList.contains('show')||modalQueue.length>0||recruitResolving}
+function dsBuild(c,s,id){
+ const p=mkChar(s.form);v181Restore(p,s,V181_GROWTH);
+ for(const k of DS_PROGRESS){
+  if(!c)break;
+  if(k==='v091'){if(p.v091&&c.v091){p.v091.counts=dsMax(c.v091.counts,s.v091?.counts);p.v091.scores=dsMax(c.v091.scores,s.v091?.scores)}continue}
+  if(k==='ep'&&v181Stage(c.form)>v181Stage(s.form)){p.ep=c.ep;continue}
+  if(k in c||k in s)p[k]=dsMax(c[k],s[k])
+ }
+ if(p.v091)p.v091.v011Owner=p;
+ const lead=activeChar();
+ p.x=c?c.x:clamp((lead?.x||WORLD.w/2)+45,40,WORLD.w-40);p.y=c?c.y:clamp((lead?.y||WORLD.h/2)+25,40,WORLD.h-40);
+ p.hp=Math.min(p.maxHp,Math.max(1,c?c.hp:(s.hp||p.maxHp*.5)));p.dead=false;p.v063RemovalPending=false;
+ if(c)for(const k of ['ult','skillCd','subCd','atkCd','dash','dashTimer'])if(typeof c[k]==='number')p[k]=c[k];
+ return p
+}
+function dsPin(p,id){
+ rhIds.set(p,id);Object.defineProperty(p,'runMemberId',{value:id,writable:false,enumerable:false,configurable:true});
+ rhEquipment.set(p,v181Copy(p.v107Relics||[]));rhHp.set(p,Math.max(1,p.hp));drWatchMember(p)
+}
+function dsAfter(id,p){
+ rhExpected=party.slice();rhMember(p,'active');dsHold.delete(id);dsRing.set(id,[]);dsSample(p);
+ if(!dsHold.size){dsPending=false;dsEmpty=0}
+}
+// Returns {ok,msg}. replaceWith: living member to give up its slot when a lost individual comes back to a full party.
+function dsRestore(x,replaceWith){
+ if(!rhLive()||state!=='playing')return {ok:false,msg:'진행 중인 런에서만 복구할 수 있습니다.'};
+ if(dsModalOpen())return {ok:false,msg:'보상·선택 화면이 열려 있습니다. 먼저 닫은 뒤 복구해 주세요.'};
+ const id=x.id,s=x.e.snap,c=x.kind==='reset'?party.find(p=>rhId(p)===id):null;
+ if(x.kind==='reset'&&!c)return {ok:false,msg:'대상이 파티에 없습니다.'};
+ if(x.kind==='lost'&&party.length>=3&&!replaceWith)return {ok:false,msg:'파티가 가득 찼습니다. 대신 내보낼 동료를 고르세요.'};
+ if(x.kind==='lost'&&replaceWith&&!party.includes(replaceWith))return {ok:false,msg:'교체할 동료가 파티에 없습니다.'};
+ const before=rhTeam(),targets=c?[c]:(replaceWith?[replaceWith]:[]),detail={ids:[id],mode:x.kind,fields:x.fields.slice(),age:x.age,from:x.e.time};
+ let done=false,undo=null;
+ drCommand('restore',targets,()=>{
+  if(x.kind==='reset'&&!x.fields.includes('form')){
+   const prev={};for(const k of x.fields){prev[k]=v181Copy(k==='v091'?c.v091:c[k])}
+   for(const k of x.fields){
+    if(k==='v091'){c.v091=c.v091||{};c.v091.counts=dsMax(c.v091.counts,s.v091?.counts);c.v091.scores=dsMax(c.v091.scores,s.v091?.scores);c.v091.v011Owner=c}
+    else c[k]=dsMax(c[k],s[k])
+   }
+   if(x.fields.includes('v107Relics')){rhEquipment.set(c,v181Copy(c.v107Relics||[]));try{v107Refresh(c)}catch(e){}}
+   undo={mode:'fields',id,c,prev};done=true;dsAfter(id,c)
+  }else{
+   const p=dsBuild(c,s,id),old=c||replaceWith||null;
+   dsPin(p,id);
+   if(old&&!c&&rhId(old))rhRun.members[rhId(old)].status='replaced';
+   if(RH_recruit(old,()=>p)){undo=c?{mode:'swap',id,p,c}:null;done=true;dsAfter(id,p)}
+   else if(old&&!c)rhRun.members[rhId(old)].status='active'
+  }
+ },detail);
+ if(!done)return {ok:false,msg:'복구하지 못했습니다.'};
+ dsUndo=undo;
+ rhEvent('restore',[id],detail,before);
+ try{renderStatus()}catch(e){}
+ return {ok:true,msg:dsName(s.form)+' #'+id+' 복구 완료 (게임 시간 '+rhTime(x.e.time)+' 기준).'}
+}
+function dsRollback(){
+ const u=dsUndo;if(!u||!rhLive())return {ok:false,msg:'되돌릴 복구가 없습니다.'};
+ if(dsModalOpen())return {ok:false,msg:'선택 화면을 먼저 닫아 주세요.'};
+ const before=rhTeam();let done=false;
+ if(u.mode==='fields'){
+  if(!party.includes(u.c))return {ok:false,msg:'대상이 파티에 없습니다.'};
+  drCommand('restore',[u.c],()=>{for(const k of Object.keys(u.prev)){u.c[k]=v181Copy(u.prev[k]);if(k==='v091'&&u.c.v091)u.c.v091.v011Owner=u.c}if(u.prev.v107Relics){rhEquipment.set(u.c,v181Copy(u.c.v107Relics||[]));try{v107Refresh(u.c)}catch(e){}}done=true},{ids:[u.id],undo:true});
+  if(done){rhExpected=party.slice();rhMember(u.c);dsRing.set(u.id,[]);dsHold.set(u.id,performance.now())}
+ }else{
+  if(!party.includes(u.p))return {ok:false,msg:'대상이 파티에 없습니다.'};
+  drCommand('restore',[u.p],()=>{rhIds.set(u.c,u.id);rhRun.members[u.id].status='active';if(RH_recruit(u.p,()=>u.c)){done=true;rhExpected=party.slice()}},{ids:[u.id],undo:true});
+  if(done){rhMember(u.c);dsRing.set(u.id,[]);dsHold.set(u.id,performance.now())}
+ }
+ if(!done)return {ok:false,msg:'되돌리지 못했습니다.'};
+ dsPending=true;dsUndo=null;rhEvent('restore',[u.id],{ids:[u.id],undo:true},before);try{renderStatus()}catch(e){}
+ return {ok:true,msg:'복구를 되돌렸습니다.'}
+}
+// --- UI: persistent notice with "복구하기", and a confirmation panel that lists exactly what will change.
+const dsBar=document.createElement('div');dsBar.id='runRecoverBar';dsBar.setAttribute('role','alert');
+dsBar.style.cssText='position:fixed;left:12px;top:132px;z-index:191;max-width:min(88vw,470px);padding:8px 10px;background:#4a1d1d;color:#ffe3e3;border:2px solid #e07070;font:12px/1.5 system-ui,sans-serif;display:none;gap:8px;align-items:center;flex-wrap:wrap';
+document.body.appendChild(dsBar);
+const dsPanel=document.createElement('section');dsPanel.id='runRecoverPanel';dsPanel.setAttribute('role','dialog');dsPanel.setAttribute('aria-modal','true');
+dsPanel.style.cssText='position:fixed;inset:0;z-index:2100;display:none;background:rgba(3,8,19,.94);color:#e8f0fc;overflow:auto;padding:max(14px,env(safe-area-inset-top)) 14px;box-sizing:border-box;font:15px/1.6 system-ui,sans-serif';
+document.body.appendChild(dsPanel);
+function dsBtn(text,fn,primary,off){const b=document.createElement('button');b.type='button';b.textContent=text;b.disabled=!!off;b.style.cssText='font:inherit;font-weight:700;color:#e3f2ff;background:'+(primary?'#214769':'#172a48')+';border:2px solid '+(primary?'#83dbfb':'#6685b5')+';border-radius:3px;padding:8px 14px;margin:4px 6px 4px 0;min-height:40px;cursor:'+(off?'not-allowed':'pointer')+(off?';opacity:.5':'');b.onclick=fn;return b}
+function dsBarHide(){dsBar.style.display='none'}
+function dsBarShow(n){
+ dsBar.replaceChildren();const t=document.createElement('span');t.textContent='⚠ 초기화·유실이 의심되는 디지몬 '+n+'마리';
+ dsBar.append(t,dsBtn('복구하기',dsOpen,true),dsBtn('무시',()=>{dsHold.clear();dsPending=false;dsBarHide()}));dsBar.style.display='flex'
+}
+function dsOpen(){if(dsPanel.style.display==='none')dsPrevPaused=paused;paused=true;dsPanel.style.display='block';dsRender('')}
+function dsClose(){dsPanel.style.display='none';paused=dsPrevPaused}
+function dsRender(msg){
+ const cands=dsCandidates(),blocked=dsModalOpen();dsPanel.replaceChildren();
+ const wrap=document.createElement('div');wrap.style.cssText='max-width:760px;margin:16px auto';
+ const h=document.createElement('h1');h.textContent='초기화 의심 디지몬 복구';h.style.cssText='font-size:23px;margin:0 0 6px';wrap.append(h);
+ const info=document.createElement('p');info.style.color='#9fb2cd';info.textContent='이상이 감지되기 직전의 저장 상태와 현재를 비교합니다. 복구 시점 이후 얻은 성장은 유지되고 낮아진 값만 되돌립니다. 진화체가 되돌아가는 개체는 능력치도 그 시점 값이 됩니다.';wrap.append(info);
+ if(msg){const m=document.createElement('p');m.style.cssText='color:#9eddbb;font-weight:700';m.textContent=msg;wrap.append(m)}
+ if(blocked){const m=document.createElement('p');m.style.color='#ffb0b0';m.textContent='보상·선택 화면이 열려 있어 지금은 복구할 수 없습니다. 선택 화면을 닫은 뒤 다시 열어 주세요.';wrap.append(m)}
+ if(!cands.length&&!msg){const m=document.createElement('p');m.textContent='복구할 항목이 없습니다.';wrap.append(m)}
+ for(const x of cands){
+  const card=document.createElement('div');card.style.cssText='border:2px solid #344e75;background:#101c30;padding:14px;margin:12px 0';
+  const row=document.createElement('div');row.style.cssText='display:flex;gap:12px;align-items:center';
+  const im=new Image();im.src=v5Portrait(x.e.snap.form);im.alt='';im.style.cssText='width:64px;height:64px;object-fit:contain;image-rendering:pixelated';
+  const tx=document.createElement('div');const nm=document.createElement('strong');nm.textContent='#'+x.id+' '+dsName(x.kind==='reset'?x.c.form:x.e.snap.form);
+  const ds=document.createElement('div');ds.textContent=dsDescribe(x);const ag=document.createElement('div');ag.style.color='#9fb2cd';ag.textContent='복구 시점: 게임 시간 '+rhTime(x.e.time)+' ('+x.age+'초 전)';
+  tx.append(nm,ds,ag);row.append(im,tx);card.append(row);
+  const act=document.createElement('div');act.style.marginTop='8px';
+  const run=(rep)=>{const r=dsRestore(x,rep);dsRender(r.msg)};
+  if(x.kind==='lost'&&party.length>=3){const p=document.createElement('div');p.textContent='파티가 가득 찼습니다. 복구하면 아래 동료 한 명이 파티에서 빠집니다.';p.style.color='#ffd9a0';act.append(p);for(const m of party)act.append(dsBtn(m.name+' 대신 복구',()=>run(m),false,blocked))}
+  else act.append(dsBtn('이 디지몬 복구',()=>run(null),true,blocked));
+  card.append(act);wrap.append(card)
+ }
+ const foot=document.createElement('div');foot.style.marginTop='12px';
+ if(cands.length>1&&!blocked&&!cands.some(x=>x.kind==='lost'&&party.length>=3))foot.append(dsBtn('모두 복구',()=>{let last='';for(const x of dsCandidates()){const r=dsRestore(x,null);last=r.msg}dsRender(last)},true));
+ if(dsUndo)foot.append(dsBtn('방금 복구 되돌리기',()=>{const r=dsRollback();dsRender(r.msg)},false,blocked));
+ foot.append(dsBtn('닫기',dsClose));wrap.append(foot);dsPanel.append(wrap)
+}
+function dsPoll(){
+ if(!rhLive()||state!=='playing'){dsBarHide();return}
+ if(!dsPending)return;
+ const n=dsCandidates().length;
+ if(n){dsEmpty=0;dsBarShow(n);if(dsPanel.style.display!=='none')dsRender('')}
+ else{dsBarHide();if(++dsEmpty>=6){dsHold.clear();dsPending=false;dsEmpty=0}}
+}
+setInterval(dsPoll,1000);
+const DS_update=update;
+update=function(dt){const r=DS_update(dt);dsTick(dt);return r};
+const DS_init=initGame;
+initGame=function(...args){dsReset();return DS_init(...args)};
+RH_NAMES.restore='복구';
 // Local persistence is deliberately opt-in and separate from memory upgrades.
 function rhRead(){const raw=localStorage.getItem(RH_KEY);if(!raw)return {schema:1,runs:[]};const d=JSON.parse(raw);if(d.schema!==1||!Array.isArray(d.runs)||d.runs.some(r=>!r||typeof r.uid!=='string'||!Array.isArray(r.events)||!r.members))throw Error('저장된 런 기록을 읽을 수 없습니다. 기존 데이터는 변경하지 않았습니다.');return d}
-function rhSave(record){const d=rhRead();if(!d.runs.some(r=>r.uid===record.uid))d.runs.push(JSON.parse(JSON.stringify(record)));localStorage.setItem(RH_KEY,JSON.stringify(d));return true}
+function rhSave(record){const d=rhRead();if(!d.runs.some(r=>r.uid===record.uid)){const copy=JSON.parse(JSON.stringify(record));if(copy.trace&&copy.trace.length>150)copy.trace=copy.trace.slice(-150);d.runs.push(copy)}localStorage.setItem(RH_KEY,JSON.stringify(d));return true}
 const RH_OUTCOME={gameover:'게임오버',ending:'일반 엔딩','true-ending':'진 엔딩'};
 const RH_STATUS={active:'최종 파티',dead:'사망',sold:'판매',replaced:'교체',fused:'조그레스 소모','revived-as-new':'기적으로 새 개체 생성'};
 const rhPanel=document.createElement('section');rhPanel.id='runHistoryPanel';rhPanel.hidden=true;rhPanel.setAttribute('role','dialog');rhPanel.setAttribute('aria-modal','true');rhPanel.setAttribute('aria-label','나의 런 기록');document.body.appendChild(rhPanel);
@@ -22512,7 +22758,9 @@ function rhEventText(e,record){
  if(e.type==='miracle')return (d.links||[]).map(l=>'#'+l.from+' → 새 개체 #'+l.to+' '+form(l.form)).join(' / ');
  if(e.type==='replace')return '#'+e.ids[0]+' '+form(d.oldForm)+' 교체 → #'+e.ids[1]+' '+form(d.newForm);
  if(e.type==='skip')return form(d.form)+' 디지에그 넘기기';
+ if(e.type==='devolve')return (d.changes||[]).map(x=>'#'+x.id+' '+form(x.from)+' → '+form(x.to)+(x.ep?' (EP '+x.ep[0]+'→'+x.ep[1]+')':'')).join(' / ')+' 퇴화';
  if(e.type==='blocked'||e.type==='audit')return names+' · '+d.reason;
+ if(e.type==='restore')return names+(d.undo?' 복구 되돌림':' 복구 · '+(d.mode==='lost'?'파티에서 사라진 개체 복귀':(d.fields||[]).map(k=>DS_LABEL[k]||k).join(', '))+' · 게임 시간 '+rhTime(d.from||0)+' 상태 기준');
  return (RH_NAMES[e.type]||e.type)+(names?' · '+names:'')
 }
 function rhDetail(record){
@@ -22543,6 +22791,27 @@ function rhList(){
  }catch(e){shell.append(rhEl('p',e.message,'rh-error'))}
 }
 const rhMenuBtn=rhButton('나의 런 기록',rhList);rhMenuBtn.id='runHistoryBtn';$('#startBtn').insertAdjacentElement('afterend',rhMenuBtn);
+function rhLastLabel(){rhLastBtn.textContent='마지막 런 기록'+(rhStore.flagged?' ⚠':'')}
+function rhLastStatus(r){return r.endedAt?(RH_OUTCOME[r.outcome]||'종료'):'진행 중 종료(저장 시점까지)'}
+function rhLastRun(){
+ const shell=rhShell('마지막 런 기록',()=>{rhPanel.hidden=true;rhLastBtn.focus()});
+ shell.append(rhEl('p','진행 중에 자동으로 보관된 기록입니다. 문제가 생겼을 때 파일로 받아 개발자에게 보내 주세요. 이 브라우저에만 저장되며 서버로 전송되지 않습니다.','rh-muted'));
+ const rows=[];
+ if(rhStore.flagged)rows.push(['이상 징후가 기록된 런',rhStore.flagged]);
+ if(rhStore.last&&!(rhStore.flagged&&rhStore.last.uid===rhStore.flagged.uid))rows.push(['가장 최근 런',rhStore.last]);
+ else if(rhStore.last&&rows.length)rows[0][0]+=' (가장 최근 런과 동일)';
+ if(!rows.length){shell.append(rhEl('div','보관된 기록이 없습니다.','rh-card'));return}
+ for(const [label,r] of rows){
+  const card=rhEl('div',null,'rh-card'),flags=Object.entries(r.flags||{}).map(([k,n])=>(RH_FLAG_NAMES[k]||k)+' '+n).join(' · ');
+  card.append(rhEl('h2',label),rhEl('p',rhDate(r.startedAt)+' · '+rhTime(r.duration||0)+' · 레벨 '+(r.level||'?')+' · '+rhLastStatus(r),'rh-muted'),rhEl('p','이상 징후: '+(flags||'없음')+' · 팀 변경 '+(r.events||[]).length+'건 · 추적 '+(r.trace||[]).length+'건','rh-muted'));
+  const lastEvent=(r.events||[]).slice(-1)[0],team=rhEl('div',null,'rh-party');
+  for(const row of (r.final&&r.final.length?r.final:(lastEvent?.after||[])))team.append(rhPortrait(row));card.append(team);
+  const actions=rhEl('div',null,'rh-actions');
+  actions.append(rhButton('기록 파일 내려받기',()=>rhExport(r),true),rhButton('삭제',()=>{if(!confirm('이 기록을 삭제할까요?'))return;try{if(rhStore.flagged&&rhStore.flagged.uid===r.uid)rhStore.flagged=null;if(rhStore.last&&rhStore.last.uid===r.uid)rhStore.last=null;localStorage.setItem(RH_LAST_KEY,JSON.stringify(rhStore));rhLastLabel();rhLastRun()}catch(e){alert('삭제하지 못했습니다.')}}));
+  card.append(actions);shell.append(card)
+ }
+}
+const rhLastBtn=rhButton('마지막 런 기록',rhLastRun);rhLastBtn.id='lastRunBtn';rhMenuBtn.insertAdjacentElement('afterend',rhLastBtn);rhLastLabel();
 document.title=DR_TITLE;$('#buildBadge').textContent=DR_BADGE;
 
 // Regression-test hook. Inert unless the page is opened with ?drtest=1.
@@ -22561,6 +22830,8 @@ if(new URLSearchParams(location.search).get('drtest')==='1'){
   guard:()=>v181Guard(),capture:()=>v181Capture(),signature:v=>v181Signature(v),
   mark:c=>drMarkEvolve(c),
   cmd:(type,targets,fn)=>drCommand(type,targets,fn),poll:()=>drPoll(),
+  ds:{busy:n=>{v181Busy=n},flag:()=>dsFlag({kind:'guard'}),get ring(){return dsRing},get hold(){return dsHold},get pending(){return dsPending},cands:()=>dsCandidates(),restore:(x,r)=>dsRestore(x,r),rollback:()=>dsRollback(),poll:()=>dsPoll(),tick:dt=>dsTick(dt),sample:c=>dsSample(c),drop:c=>{party=party.filter(p=>p!==c);rhExpected=rhExpected.filter(p=>p!==c);v181Expected=v181Expected.filter(p=>p!==c)},get undo(){return dsUndo}},
+  setBack:f=>{v080RewardBackRender=f},get store(){return rhStore},saveNow:()=>rhSaveNow(),
   setState:v=>{state=v},setPaused:v=>{paused=v}
  };
 }
