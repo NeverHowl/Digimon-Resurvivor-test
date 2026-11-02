@@ -1,0 +1,161 @@
+#mobileControls[hidden]{display:none!important}
+#mobileControls{position:absolute;inset:0;z-index:50;pointer-events:none;user-select:none;-webkit-user-select:none}
+#mobileControls .mobileCluster,#mobileControls button,#mobileControls .mobileStick{pointer-events:auto;touch-action:none}
+#mobileControls button{border:2px solid #88a9cd;color:#f5f9ff;background:rgba(18,37,61,.91);box-shadow:0 5px 17px #0009;font-weight:900;text-shadow:0 1px 2px #0008}
+#mobileControls button:active{background:#4b779a;transform:scale(.94)}
+.mobileCluster{position:absolute;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:9px}
+.mobileCluster.left{left:calc(14px + env(safe-area-inset-left,0px))}
+.mobileCluster.right{right:calc(14px + env(safe-area-inset-right,0px));gap:7px}
+.mobileStick{position:relative;width:clamp(92px,26vh,126px);height:clamp(92px,26vh,126px);border:3px solid #87b7d9;border-radius:50%;background:radial-gradient(circle,#18334a8c,#0a1421c9);box-shadow:inset 0 0 17px #659fc756,0 0 13px #0009}
+.mobileStick:before{content:'';position:absolute;inset:23%;border:1px solid #77b7da69;border-radius:50%}
+.mobileNub{position:absolute;left:50%;top:50%;width:39%;height:39%;transform:translate(-50%,-50%);border-radius:50%;border:3px solid #c5ecff;background:#5b99c6;box-shadow:0 2px 11px #061524}
+.mobileStickLabel{position:absolute;bottom:-2px;left:50%;transform:translate(-50%,-50%);font:900 10px system-ui;letter-spacing:.1em;color:#d5f2ff;pointer-events:none}
+.mobileUtilityButtons{display:flex;flex-direction:column;gap:8px;align-self:center}
+.mobileUtilityButtons button{width:52px;height:49px;border-radius:13px;font-size:12px}
+.mobileRightButtons{display:grid;grid-template-columns:repeat(2,94px);gap:7px;align-items:center}
+.mobileRightButtons .mobileCastStick{
+ position:relative;width:94px;height:94px;border-radius:50%;overflow:hidden;
+ background:radial-gradient(circle,#315a7988,#0b233acc);touch-action:none
+}
+.mobileRightButtons .mobileCastStick.ultAction{background:radial-gradient(circle,#806a3888,#3c2b19dd);border-color:#e3b85d}
+.mobileCastStick:before{content:'';position:absolute;inset:15%;border:1px solid #9acee469;border-radius:50%;pointer-events:none}
+.mobileCastNub{position:absolute;left:50%;top:43%;width:36%;height:36%;transform:translate(-50%,-50%);border-radius:50%;border:2px solid #d5f2ff;background:#74b1d0ab;pointer-events:none}
+.ultAction .mobileCastNub{border-color:#ffedbd;background:#c6a75da9}
+.mobileCastLabel{position:absolute;bottom:7px;left:0;width:100%;font-size:12px;pointer-events:none}
+.mobileCastStick.aiming{border-color:#b8efff;box-shadow:0 0 19px #62d5ff99}
+.mobileCastStick.aiming.ultAction{border-color:#ffe28a;box-shadow:0 0 19px #f8c565aa}
+#mobileAimMarker{display:none;position:absolute;z-index:2;width:32px;height:32px;border:3px solid #95e8ff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 14px #50c9ff, inset 0 0 10px #50c9ff;pointer-events:none}
+#mobileAimMarker.active{display:block}
+.mobileSubButtons{grid-column:span 2;display:flex;justify-content:center;gap:5px}
+.mobileRightButtons .subAction{width:57px;height:36px;border-radius:10px;background:#183b50;font-size:10px}
+.mobileTopButtons{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;gap:6px;pointer-events:none}
+.mobileTopButtons button{pointer-events:auto;touch-action:none;padding:5px 10px;border-radius:9px;font-size:11px}
+#mobileLandscapeGate{display:none}
+html.mobileGame,html.mobileGame body{overscroll-behavior:none;width:100%;height:100%;touch-action:manipulation}
+html.mobileGame #c{touch-action:none}
+html.mobileGame #game,html.mobileGame #game:fullscreen{
+ position:fixed;inset:0;width:100vw;height:100dvh;min-height:100dvh;overflow:hidden
+}
+html.mobileGame #game .gamewrap{width:100%;height:100%}
+html.mobileGame .controls,html.mobileGame #skillHud,html.mobileGame #dashHud{display:none}
+html.mobileGame .hud .topbar{padding:5px 7px;justify-content:flex-start}
+html.mobileGame #runInfo{font-size:11px;padding:4px 6px;max-width:60vw}
+html.mobileGame #statsInfo,html.mobileGame #basicMode{display:none}
+html.mobileGame .objective{top:35px;padding:4px 7px;font-size:11px;max-width:57vw;text-align:center}
+html.mobileGame .party{top:56px;left:calc(5px + env(safe-area-inset-left,0px));bottom:auto;flex-direction:column;gap:3px}
+html.mobileGame .member{width:94px;padding:3px 5px;font-size:9px}
+html.mobileGame .member .bar{height:4px;margin-top:3px}
+html.mobileGame .member .mrow{gap:2px}
+html.mobileGame .bossbar{top:68px;width:min(370px,51vw);padding:4px 7px}
+html.mobileGame .bossbar .bar{height:7px}
+html.mobileGame .statusmsg{top:103px;font-size:16px;max-width:60vw;text-align:center}
+html.mobileGame .modal,html.mobileGame .statusOverlay{z-index:70}
+html.mobileGame .modalcard{max-height:92dvh;overflow:auto;padding:12px}
+html.mobileGame .choices{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));max-height:64dvh;overflow:auto}
+html.mobileGame .choice{min-height:118px;padding:10px;font-size:12px}
+html.mobileGame .choice h3{font-size:14px}
+html.mobileGame .menu-card{max-height:96dvh;overflow:auto;padding:18px}
+html.mobileGame .select-grid,html.mobileGame .charselect-layout,html.mobileGame .codex-layout{min-height:0}
+html.mobileGame .storyPanel{max-height:55dvh;overflow:auto;margin-bottom:3vh;padding:12px 16px}
+@media (max-height:430px){
+ .mobileStick{width:88px;height:88px}
+ .mobileUtilityButtons button{width:44px;height:40px;font-size:10px}
+ .mobileRightButtons{grid-template-columns:repeat(2,77px);gap:5px}
+ .mobileRightButtons .mobileCastStick{width:77px;height:77px}
+ .mobileCastLabel{font-size:10px}
+ .mobileRightButtons .subAction{width:48px;height:32px;font-size:9px}
+ .mobileCluster{gap:5px;bottom:calc(5px + env(safe-area-inset-bottom,0px))}
+}
+@media (orientation:portrait){
+ html.mobileGame #game.active #mobileLandscapeGate{
+  position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:#080d19ee;text-align:center;pointer-events:auto
+ }
+ .mobileLandscapeCard{width:min(90vw,440px);padding:28px 22px;border:1px solid #6bbddf;border-radius:18px;background:#132239;color:#f5faff;box-shadow:0 12px 45px #000b}
+ .mobileLandscapeIcon{font-size:50px;color:#87daff;line-height:1;margin-bottom:12px}
+ .mobileLandscapeCard strong{display:block;font-size:20px}
+ .mobileLandscapeCard p{font-size:13px;line-height:1.6;color:#bfd5e9;margin:13px 0 22px}
+ .mobileLandscapeCard button{border:1px solid #88d7fa;background:#245e80;color:white;border-radius:11px;padding:11px 16px;font-weight:800;touch-action:manipulation}
+}
+
+/* v0.17.2: floating left stick and a dash-centered, thumb-reachable action arc. */
+#mobileControls .mobileCluster{pointer-events:none}
+#mobileControls .mobileCluster.left{position:static;display:contents}
+#mobileControls #mobileMove{
+ position:fixed;left:0;top:0;width:clamp(88px,25vh,112px);height:clamp(88px,25vh,112px);
+ transform:translate(-50%,-50%);opacity:0;pointer-events:none;border-width:2px;
+ background:radial-gradient(circle,#23496555,#0a142160);box-shadow:inset 0 0 14px #8ddfff24
+}
+#mobileControls #mobileMove.active{opacity:.8}
+#mobileControls .mobileNub{border-width:2px;background:#b6dffc70;box-shadow:none}
+#mobileControls .mobileStickLabel{display:none}
+#mobileControls .mobileCluster.right{
+ --action-size:clamp(84px,25vh,112px);
+ display:block;width:calc(var(--action-size)*2.45);height:calc(var(--action-size)*2.42);
+ right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px))
+}
+#mobileControls .mobileUtilityButtons,#mobileControls .mobileRightButtons{display:contents}
+#mobileControls .mobileCluster.right button{position:absolute;box-shadow:0 2px 8px #0005;border-width:1px;background:#12233499;backdrop-filter:none;touch-action:none}
+#mobileControls [data-mobile-action="dash"]{
+ right:0;bottom:calc(var(--action-size)*.35);width:var(--action-size);height:var(--action-size);
+ border-radius:50%;border:2px solid #d2ebff;background:radial-gradient(circle,#547d9677,#193549bb);
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:14px
+}
+#mobileControls .mobileDashIcon{font:700 42px/30px system-ui;transform:skew(-12deg);color:#e7f9ff}
+#mobileControls [data-mobile-action="tag"]{
+ right:calc(var(--action-size)*.09);bottom:calc(var(--action-size)*1.45);
+ width:calc(var(--action-size)*.82);height:calc(var(--action-size)*.36);
+ border-radius:18px;font-size:12px;letter-spacing:.12em
+}
+#mobileControls .mobileRightButtons .mobileCastStick{
+ right:calc(var(--action-size)*1.15);bottom:calc(var(--action-size)*.60);
+ width:calc(var(--action-size)*.72);height:calc(var(--action-size)*.72);overflow:visible;
+ background:radial-gradient(circle,#45839966,#152e41aa);border-color:#8fe1f4
+}
+#mobileControls .mobileRightButtons .ultAction{
+ right:calc(var(--action-size)*1.05);bottom:calc(var(--action-size)*1.47);
+ width:calc(var(--action-size)*.68);height:calc(var(--action-size)*.68);
+ background:radial-gradient(circle,#a4823c66,#352c1baa);border-color:#edd296
+}
+#mobileControls .mobileCastNub{top:50%;width:30%;height:30%;opacity:0;background:#d4efff66;transition:opacity .08s}
+#mobileControls .aiming .mobileCastNub{opacity:.75}
+#mobileControls .mobileCastLabel{top:33%;bottom:auto;font-size:12px;line-height:1.2}
+#mobileControls .mobileButtonState{display:block;font-size:10px;font-variant-numeric:tabular-nums;color:#e6f6ff;line-height:1.2;pointer-events:none;min-height:12px}
+#mobileControls .mobileCastStick .mobileButtonState{position:absolute;top:57%;width:100%;left:0}
+#mobileControls button.unready{border-color:#7c8b9b;color:#b6c3d3;background:#101e2b99}
+#mobileControls .mobileSubButtons{display:flex;position:absolute;right:0;bottom:0;gap:5px;height:calc(var(--action-size)*.29);width:calc(var(--action-size)*1.94)}
+#mobileControls .mobileCluster.right .mobileSubButtons .subAction{position:static;flex:1;width:auto;height:100%;border-radius:7px;font-size:9px}
+#mobileControls .mobileCastStick.aiming{border-color:#d7f9ff;box-shadow:0 0 12px #8adcff55}
+#mobileControls .mobileCastStick.aiming .mobileCastLabel{opacity:.55}
+html.mobileGame .practicePanel{max-width:190px;left:110px;top:60px;font-size:10px}
+html.mobileGame .practicePanel p{display:none}
+/* Override the later desktop HUD flow rules and legacy inline party-card sizing. */
+html.mobileGame #game .hud .controls,html.mobileGame #game .hud #statsInfo,html.mobileGame #game .hud #basicMode{display:none}
+html.mobileGame #game .hud .topbar{display:flex;padding:5px 7px}
+html.mobileGame #game .hud #runInfo{max-width:calc(100vw - 190px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.mobileGame #game .hud #objective{position:absolute;left:50%;top:36px;transform:translateX(-50%);margin:0;max-width:54vw;font-size:10px;padding:3px 6px}
+html.mobileGame #game .hud #bossbar{position:absolute;left:50%;top:67px;transform:translateX(-50%);margin:0;width:45vw;padding:3px 6px}
+html.mobileGame #game .hud .member{width:104px!important;padding:4px!important;font-size:9px}
+html.mobileGame #game .hud .member .mrow{font-size:8px!important;line-height:1.15;margin-top:2px!important}
+html.mobileGame #game .hud .member .mrow:first-child{margin-top:0!important;font-size:9px!important}
+html.mobileGame #game .hud .member .mrow:first-child b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.mobileGame #game .hud .member .bar{height:5px;margin-top:2px;border-width:1px!important}
+
+/* v0.17.2a: inspect the frozen battlefield and party without dismissing rewards. */
+#mobileRewardToolbar{display:none}
+html.mobileGame #game #modal.show #mobileRewardToolbar{
+ display:flex;position:absolute;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+ gap:8px;z-index:2;pointer-events:auto;white-space:nowrap
+}
+html.mobileGame #mobileRewardToolbar button{font-family:inherit;font-weight:700;font-size:12px;line-height:1.2;color:#e5f3ff;background:#142b40;border:2px solid #87bad7;padding:9px 12px;touch-action:manipulation}
+html.mobileGame #game #modal.show{padding-bottom:50px;box-sizing:border-box}
+html.mobileGame #game #modal.show .modalcard{max-height:calc(100dvh - 65px);box-sizing:border-box}
+html.mobileGame #game #modal.mobileRewardFolded{background:transparent;pointer-events:none}
+html.mobileGame #game #modal.mobileRewardFolded .modalcard{display:none}
+html.mobileGame #game #statusOverlay{z-index:90}
+/* The gauge belongs to the dash button, so it remains visible on every phone layout. */
+#mobileControls #mobileDashGauge{display:flex;gap:3px;width:68%;height:6px;pointer-events:none;margin-top:3px}
+#mobileControls #mobileDashGauge .dashSeg{flex:1;min-width:0;height:6px;overflow:hidden;border:1px solid #638fa5;background:#0b1527;border-radius:1px}
+#mobileControls #mobileDashGauge .dashSegFill{height:100%;background:#9ce6ff;box-shadow:none;transition:none}
+#mobileControls #mobileDashRecharge{font-size:9px;line-height:12px;height:12px;pointer-events:none;color:#d0eeff}
+#mobileControls [data-mobile-action="dash"] .mobileDashIcon{font-size:33px;line-height:24px}
